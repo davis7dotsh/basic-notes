@@ -6,7 +6,7 @@ import type { NoteId, SearchHit } from '../bridge/protocol'
 // With a query, the last row is always `New note “query”` — and the whole empty state when nothing matches.
 
 export type SearchDeps = {
-  open(id: NoteId): void
+  open(hit: SearchHit): void
   create(query: string): void
   remove(id: NoteId): Promise<boolean>
   togglePin(id: NoteId): Promise<void>
@@ -319,7 +319,7 @@ export function createSearch(app: HTMLElement, deps: SearchDeps) {
     const hit = current()
     if (!hit) return
     close(false)
-    deps.open(hit.id)
+    deps.open(hit)
   }
 
   function create() {

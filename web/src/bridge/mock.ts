@@ -172,17 +172,17 @@ const payload = (id: NoteId, isNew = false): NotePayload => ({
   canGoForward: forward.length > 0,
 })
 
-function show(id: NoteId, isNew = false) {
+function show(id: NoteId, isNew = false, passage?: NotePayload['passage']) {
   current = id
-  deliver({ type: 'loadNote', note: payload(id, isNew) })
+  deliver({ type: 'loadNote', note: { ...payload(id, isNew), passage } })
 }
 
-function navigate(id: NoteId, isNew = false) {
+function navigate(id: NoteId, isNew = false, passage?: NotePayload['passage']) {
   if (id !== current) {
     back.push(current)
     forward.length = 0
   }
-  show(id, isNew)
+  show(id, isNew, passage)
 }
 
 const titleOf = (content: string) => (content.split('\n').find((l) => l.trim()) ?? '').replace(/^#+\s*/, '').trim()
@@ -211,7 +211,10 @@ function search(query: string): SearchHit[] {
     const snippet = snippetLine.replace(/^[#>\-*\s[\]x]+/, '').trim()
     const titleHighlights = rangesOf(title, terms)
     const pinned = pinIndex(id) !== null
+    const passageLine = terms.some(t => snippetLine.toLowerCase().includes(t)) ? snippetLine : lines.find(l => l.trim()) ?? ''
+    const firstMatch = rangesOf(passageLine, terms).sort((a, b) => a[0] - b[0])[0]
     hits.push({
+      passage: firstMatch && { offset: n.content.indexOf(passageLine) + firstMatch[0], text: passageLine.slice(...firstMatch) },
       id,
       title,
       snippet,
@@ -266,13 +269,15 @@ export async function mockSend(msg: ToSwift): Promise<unknown> {
       if (mock.fail.save) throw new Error('mock: You don’t have permission to save the file.')
       notes.set(msg.id, { content: msg.content, modified: Date.now() })
       return { ok: true }
+    case 'headingVisible':
+      return null
     case 'viewState':
       viewStates.set(msg.id, msg.viewState)
       return null
     case 'search':
       return search(msg.query)
     case 'open':
-      navigate(msg.id)
+      navigate(msg.id, false, msg.passage)
       return null
     case 'newNote':
       if (!(notes.get(current)?.content ?? '').trim() && current.startsWith('mock-')) {

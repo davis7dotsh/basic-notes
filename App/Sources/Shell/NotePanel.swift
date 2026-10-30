@@ -41,10 +41,9 @@ final class NotePanel: NSPanel {
     }
 }
 
-/// Root view: rounded glass (NSGlassEffectView on macOS 26+, else a behind-window blur) under a light editor-colored tint,
-/// with a hairline border. Header and editor (transparent page) sit on it as one surface.
+/// One frosted writing surface behind the native header and transparent editor.
 final class PanelRootView: NSView {
-    static let radius: CGFloat = 12
+    static let radius: CGFloat = 19
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -53,20 +52,11 @@ final class PanelRootView: NSView {
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
         layer?.borderWidth = 1
-        let backdrop: NSView
-        if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView(frame: bounds)
-            glass.cornerRadius = Self.radius
-            backdrop = glass
-        } else {
-            let blur = NSVisualEffectView(frame: bounds)
-            blur.material = .popover
-            blur.blendingMode = .behindWindow
-            blur.state = .active  // a non-activating panel is never in an active app
-            backdrop = blur
-        }
-        let tint = FillView(color: .panelTint)
-        for view in [backdrop, tint] {
+        let backdrop = NSVisualEffectView(frame: bounds)
+        backdrop.material = .underWindowBackground
+        backdrop.blendingMode = .behindWindow
+        backdrop.state = .active
+        for view in [backdrop, MoonstoneCanvas(frame: bounds)] {
             view.frame = bounds
             view.autoresizingMask = [.width, .height]
             addSubview(view)
@@ -79,6 +69,42 @@ final class PanelRootView: NSView {
 
     override func updateLayer() {
         effectiveAppearance.performAsCurrentDrawingAppearance { layer?.borderColor = NSColor.panelBorder.cgColor }
+    }
+}
+
+/// The header transmits more of the desktop than the writing area below it.
+final class MoonstoneCanvas: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(redraw), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    @objc private func redraw() { needsDisplay = true }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        Self.paint(in: bounds, appearance: effectiveAppearance, opaque: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
+    }
+
+    static func paint(in rect: NSRect, appearance: NSAppearance, opaque: Bool) {
+        guard rect.height > 0 else { return }
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let body = dark
+            ? NSColor(srgbRed: 25/255, green: 27/255, blue: 32/255, alpha: opaque ? 1 : 0.81)
+            : NSColor(srgbRed: 244/255, green: 245/255, blue: 249/255, alpha: opaque ? 1 : 0.81)
+        let header = dark
+            ? NSColor(srgbRed: 45/255, green: 48/255, blue: 56/255, alpha: opaque ? 1 : 0.53)
+            : NSColor(srgbRed: 220/255, green: 227/255, blue: 239/255, alpha: opaque ? 1 : 0.53)
+        let headerStart = max(0.52, 1 - 100 / rect.height)
+        NSGradient(colors: [body, body, header], atLocations: [0, headerStart, 1], colorSpace: .sRGB)?
+            .draw(in: rect, angle: 90)
     }
 }
 
@@ -95,19 +121,21 @@ final class FillView: NSView {
     override func updateLayer() {
         effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.cgColor }
     }
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// The native header above the web view, Raycast-style: traffic lights, the note title (+ pin) centered, and a pill of
 /// icon buttons (actions, copy, new). Everything that isn't a button drags the panel.
 final class DragStrip: NSView {
-    static let height: CGFloat = 44
+    static let height: CGFloat = 46
     var onClose: (() -> Void)?
     var onAction: ((HeaderAction) -> Void)?
     private let label = NSTextField(labelWithString: "")
     private let pin = NSImageView()
     private let lights = TrafficLights()
     private(set) var title = ""
+    private var titleLine: Int?
+    private var visibleHeadingEndLine = 0
+    private var titleFaded = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -137,7 +165,7 @@ final class DragStrip: NSView {
         })
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 0
-        buttonStack.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
+        buttonStack.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 6)
         let pill = Self.pill(around: buttonStack)
 
         for view in [lights, titleStack, pill] as [NSView] {
@@ -149,15 +177,16 @@ final class DragStrip: NSView {
         NSLayoutConstraint.activate([
             lights.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             lights.centerYAnchor.constraint(equalTo: centerYAnchor),
-            pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             pill.centerYAnchor.constraint(equalTo: centerYAnchor),
             pill.heightAnchor.constraint(equalToConstant: 28),
+            pill.widthAnchor.constraint(equalToConstant: 96),
             centered,
             titleStack.centerYAnchor.constraint(equalTo: centerYAnchor),
             titleStack.leadingAnchor.constraint(greaterThanOrEqualTo: lights.trailingAnchor, constant: 8),
             titleStack.trailingAnchor.constraint(lessThanOrEqualTo: pill.leadingAnchor, constant: -8),
         ])
-        update(title: "", pinned: false)
+        update(title: "", titleLine: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
@@ -167,6 +196,9 @@ final class DragStrip: NSView {
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
             glass.cornerRadius = 14
+            #if compiler(>=6.4)
+            if #available(macOS 27.0, *) { glass.effectIsInteractive = true }
+            #endif
             glass.contentView = content
             return glass
         }
@@ -183,10 +215,36 @@ final class DragStrip: NSView {
         return pill
     }
 
-    func update(title: String, pinned: Bool) {
+    func setPinned(_ pinned: Bool) { pin.isHidden = !pinned }
+
+    func update(title: String, titleLine: Int?) {
         self.title = title
+        self.titleLine = titleLine
         label.stringValue = title.isEmpty ? "Untitled" : title
-        pin.isHidden = !pinned
+        updateTitleVisibility()
+    }
+
+    func resetHeadingVisibility() {
+        visibleHeadingEndLine = 0
+        titleFaded = false
+        label.alphaValue = 1
+    }
+
+    func setVisibleHeading(through endLine: Int) {
+        visibleHeadingEndLine = endLine
+        updateTitleVisibility()
+    }
+
+    private func updateTitleVisibility() {
+        // An empty or image-only heading can precede the actual title elsewhere in the note.
+        let fade = titleLine.map { $0 <= visibleHeadingEndLine } ?? false
+        guard fade != titleFaded else { return }
+        titleFaded = fade
+        let alpha: CGFloat = fade ? 0 : 1
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.15
+            label.animator().alphaValue = alpha
+        }
     }
 
     var isPinned: Bool { !pin.isHidden }
@@ -258,7 +316,7 @@ final class HeaderButton: NSButton {
         image = NSImage(systemSymbolName: symbol, accessibilityDescription: toolTip)?.withSymbolConfiguration(config)
         imagePosition = .imageOnly
         isBordered = false
-        contentTintColor = .secondaryLabelColor
+        contentTintColor = .labelColor
         refusesFirstResponder = true  // the editor keeps focus (and its keys) after a click
         self.toolTip = toolTip
         target = self
@@ -276,20 +334,6 @@ final class HeaderButton: NSButton {
 }
 
 extension NSColor {
-    /// Opaque editor background (snapshots, where the glass doesn't render).
-    static let editorBackground = NSColor(name: "editorBackground") { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.122, alpha: 1)
-            : NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
-    }
-
-    /// Over the glass: mostly the editor background, so text stays crisp, with a little of what's behind showing through.
-    static let panelTint = NSColor(name: "panelTint") { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.122, alpha: 0.78)
-            : NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.78)
-    }
-
     static let pillFill = NSColor(name: "pillFill") { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(white: 1, alpha: 0.06)

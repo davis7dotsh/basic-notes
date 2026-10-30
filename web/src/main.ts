@@ -1,4 +1,4 @@
-import { ensureSyntaxTree, language } from '@codemirror/language'
+import { ensureSyntaxTree, language, syntaxTree } from '@codemirror/language'
 import { EditorSelection, StateCommand, Text, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import './styles.css'
@@ -11,6 +11,7 @@ import { createEditor, createState, External, isVimOn, setVim } from './editor/e
 import { collectImages } from './editor/imageNodes'
 import { bumpAssets, images, refreshImages, setImageFolder } from './editor/images'
 import { clusterStart, normalCaret } from './editor/unicode'
+import { locatePassage, revealPassage } from './editor/searchPassage'
 import { clearVimSearch, enterNormal, noteCopiedToClipboard, setVimClipboard, vimWantsEscape } from './editor/vimMode'
 import { createSearch } from './search/overlay'
 import { type Action, createActions } from './ui/actions'
@@ -25,6 +26,7 @@ host.className = 'editor-host'
 app.appendChild(host)
 
 type Session = {
+  visibleHeadingEndLine?: number
   id: NoteId
   isNew: boolean
   /** Content known to be on disk. */
@@ -59,7 +61,29 @@ const orphans = new Map<NoteId, string>()
 
 const log = (level: 'debug' | 'info' | 'warn' | 'error', message: string) => void send({ type: 'log', level, message }).catch(() => {})
 
+// The label fades only while the leading rendered heading is on screen. Measure the
+// block, including wrapped rows, in the same layout pass as CodeMirror's viewport.
+const headingMeasure = {
+  read(editor: EditorView) {
+    if (!session || search.isOpen() || menu.isOpen()) return 0
+    const heading = syntaxTree(editor.state).topNode.firstChild
+    if (!heading || !/^(ATX|Setext)Heading[1-6]$/.test(heading.name)) return 0
+    const viewport = editor.scrollDOM.getBoundingClientRect()
+    const top = editor.documentTop
+    const visible = top + editor.lineBlockAt(heading.from).top < viewport.bottom
+      && top + editor.lineBlockAt(heading.to).bottom > viewport.top
+    if (!visible) return 0
+    const endLine = editor.state.doc.lineAt(heading.to).number
+    return heading.name.startsWith('Setext') ? endLine - 1 : endLine
+  },
+  write(endLine: number) {
+    if (!session || endLine === session.visibleHeadingEndLine) return
+    session.visibleHeadingEndLine = endLine
+    void send({ type: 'headingVisible', id: session.id, endLine })
+  },
+}
 const view = createEditor(host, {
+  layoutChanged: editor => editor.requestMeasure(headingMeasure),
   docChanged(external) {
     if (external || !session || session.deleted) return
     session.dirty = true
@@ -76,6 +100,7 @@ guardWindowDrops()
 // Top fade while scrolled (class flips on change only).
 let scrolled = false
 const syncScrolled = () => {
+  view.requestMeasure(headingMeasure)
   const on = view.scrollDOM.scrollTop > 0
   if (on === scrolled) return
   scrolled = on
@@ -209,6 +234,7 @@ async function flush() {
 
 // ---------- notes ----------
 function finishLoad() {
+  view.requestMeasure(headingMeasure)
   if (!search.consumeExpectedLoad()) search.close(false)
   menu.close(false)
   if (search.isOpen()) search.refresh()
@@ -226,6 +252,8 @@ function loadNote(note: NotePayload) {
     if (note.content !== view.state.doc.toString() && !session.dirty && saveTimer === undefined) applyExternal(note.id, note.content)
     enterNormal(view)
     applyPendingSeed()
+    const match = locatePassage(view.state.doc, note.content, note.passage)
+    if (match) revealPassage(view, match)
     finishLoad()
     return
   }
@@ -285,7 +313,10 @@ function loadNote(note: NotePayload) {
   view.setState(createState(content, selection))
   enterNormal(view)
 
-  if (vs && vs.scrollTop > 0) {
+  const match = locatePassage(view.state.doc, note.content, note.passage)
+  if (match) {
+    revealPassage(view, match)
+  } else if (vs && vs.scrollTop > 0) {
     view.requestMeasure({
       read: () => null,
       write: () => {
@@ -444,15 +475,19 @@ async function copyNote() {
 }
 
 const search = createSearch(app, {
-  open: (id) => {
-    if (session && id === session.id) view.focus()
-    else void send({ type: 'open', id })
+  open: ({ id, passage }) => {
+    if (session && id === session.id) {
+      view.focus()
+      const match = locatePassage(view.state.doc, session.saved, passage)
+      if (match) revealPassage(view, match)
+    } else void send({ type: 'open', id, passage })
   },
   create: (query) => newNote(query || null),
   remove: deleteNote,
   togglePin,
   closed: () => view.focus(),
   openChanged: (open) => {
+    view.requestMeasure(headingMeasure)
     if (open) menu.close(false) // one overlay at a time (its `searchOpen: false` goes out first)
     void send({ type: 'searchOpen', open }).catch(() => {})
   },
@@ -519,6 +554,7 @@ const menu = createActions(app, {
   },
   closed: () => view.focus(),
   openChanged: (open) => {
+    view.requestMeasure(headingMeasure)
     if (open) search.close(false)
     void send({ type: 'searchOpen', open }).catch(() => {})
   },

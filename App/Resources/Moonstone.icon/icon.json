@@ -1,0 +1,85 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "extended-srgb:0.12941,0.18431,0.31373,1.00000",
+      "extended-srgb:0.05098,0.07843,0.17255,1.00000"
+    ]
+  },
+  "groups": [
+    {
+      "name": "High wing",
+      "layers": [
+        {
+          "name": "Raised wing",
+          "image-name": "tall-wing.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.23
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.22
+      }
+    },
+    {
+      "name": "Body fold",
+      "layers": [
+        {
+          "name": "Head and neck",
+          "image-name": "head.svg",
+          "glass": true
+        },
+        {
+          "name": "Amber beak",
+          "image-name": "beak.svg",
+          "glass": true
+        },
+        {
+          "name": "Folded breast",
+          "image-name": "collar.svg",
+          "glass": true
+        },
+        {
+          "name": "Back wing",
+          "image-name": "back-wing.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.15
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.16
+      }
+    },
+    {
+      "name": "Low wing",
+      "layers": [
+        {
+          "name": "Lower wing",
+          "image-name": "tail.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.15
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.19
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS",
+      "iOS"
+    ]
+  }
+}

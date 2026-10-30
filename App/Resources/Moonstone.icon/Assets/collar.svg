@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128">
+  <title>Folded breast</title>
+  <defs>
+    <linearGradient id="face" x1="87" y1="49" x2="61" y2="71" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8F7ED"/><stop offset="1" stop-color="#C5D1EB"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#face)" d="M52 68 96 48 83 72z"/>
+</svg>

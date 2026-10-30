@@ -29,13 +29,18 @@ export type NotePayload = {
    *  are namespaced by it (the same `assets/x.png` is a different file in another folder), and a same-id load from a
    *  different folder is a different note. */
   folder?: string
+  passage?: SearchPassage
 }
 
 export type Settings = {
   vimEnabled: boolean
 }
 
+/** Exact source Markdown at a UTF-16 offset in the indexed file. */
+export type SearchPassage = { offset: number; text: string }
+
 export type SearchHit = {
+  passage?: SearchPassage
   id: NoteId
   title: string
   /** One-line match context (or first body line when no query). */
@@ -77,7 +82,9 @@ export type ToSwift =
   | { type: 'saveImage'; base64: string; mime: string; filename: string | null }
   /** Reply: SearchHit[] (empty query => recents with pins on top). */
   | { type: 'search'; query: string }
-  | { type: 'open'; id: NoteId }
+  | { type: 'open'; id: NoteId; passage?: SearchPassage }
+  /** Last line of the leading heading while visible, zero when offscreen or absent. */
+  | { type: 'headingVisible'; id: NoteId; endLine: number }
   | { type: 'newNote' }
   /** Moves the note's file to the macOS Trash. Swift then loads another note. Reply { ok: true }; REJECTS if trashing failed (show nothing optimistic before the reply). */
   | { type: 'deleteNote'; id: NoteId }

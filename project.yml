@@ -27,14 +27,17 @@ targets:
       - path: App/Resources/Models
         type: folder
         buildPhase: resources
+      - path: App/Resources/Moonstone.icon
+        type: file
+        buildPhase: resources
       - path: App/Resources/Assets.xcassets
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Basic Notes
         CFBundleName: BasicNotes
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "0.1.1"
+        CFBundleVersion: "3"
         LSUIElement: true
         LSMinimumSystemVersion: "15.0"
         NSHumanReadableCopyright: ""
@@ -46,7 +49,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: sh.davis7.basicnotes
         PRODUCT_NAME: BasicNotes
         INFOPLIST_KEY_CFBundleDisplayName: Basic Notes
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_APPICON_NAME: Moonstone
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: App/BasicNotes.entitlements
         ENABLE_APP_SANDBOX: NO
   # Store/Search eval harness (owned by the Store/Search agent): scripts/eval.sh
