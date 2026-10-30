@@ -40,8 +40,7 @@ enum Snapshot {
             let bounds = NSRect(origin: .zero, size: size)
             let shape = NSBezierPath(roundedRect: bounds, xRadius: PanelRootView.radius, yRadius: PanelRootView.radius)
             shape.addClip()
-            NSColor.editorBackground.setFill()  // the glass doesn't render here: its opaque base
-            bounds.fill()
+            MoonstoneCanvas.paint(in: bounds, appearance: root.effectiveAppearance, opaque: true)
             let webFrame = webView.frame
             webImage.draw(in: webFrame, from: .zero, operation: .sourceOver, fraction: 1)
             stripRep.draw(in: strip.frame, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)

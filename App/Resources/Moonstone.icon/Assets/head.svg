@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128">
+  <title>Head and neck</title>
+  <defs>
+    <linearGradient id="face" x1="95" y1="48" x2="93" y2="68" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF1D5"/><stop offset="1" stop-color="#F1DFC0"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#face)" d="M96 48 105 56 98 60 83 72z"/>
+</svg>

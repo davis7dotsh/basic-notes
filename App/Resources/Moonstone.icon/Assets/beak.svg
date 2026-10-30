@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128">
+  <title>Amber beak</title>
+  <defs>
+    <linearGradient id="face" x1="104" y1="56" x2="107" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD486"/><stop offset="1" stop-color="#FFB970"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#face)" d="M105 56 113 61 98 60z"/>
+</svg>

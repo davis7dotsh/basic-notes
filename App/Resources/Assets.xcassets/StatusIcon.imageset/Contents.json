@@ -1,21 +1,10 @@
 {
-  "images" : [
-    {
-      "filename" : "status.png",
-      "idiom" : "mac",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "status@2x.png",
-      "idiom" : "mac",
-      "scale" : "2x"
-    }
+  "images": [
+    { "filename": "swift.svg", "idiom": "mac" }
   ],
-  "info" : {
-    "author" : "xcode",
-    "version" : 1
-  },
-  "properties" : {
-    "template-rendering-intent" : "template"
+  "info": { "author": "xcode", "version": 1 },
+  "properties": {
+    "preserves-vector-representation": true,
+    "template-rendering-intent": "template"
   }
 }

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128">
+  <title>Raised wing</title>
+  <defs>
+    <linearGradient id="face" x1="28" y1="21" x2="58" y2="67" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ECF2FF"/><stop offset="1" stop-color="#A4BAE5"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#face)" d="M27 21 78 57 52 68z"/>
+</svg>

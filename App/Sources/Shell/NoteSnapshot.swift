@@ -158,10 +158,10 @@ final class NoteSnapshot: NSObject, WKNavigationDelegate {
     /// Wraps the note's document (its own doctype/html/head/body tags inside are ignored or merged by the parser).
     private static let head = """
     <!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    :root { color-scheme: light dark; --bg: #fff; --fg: #1d1d1f; --muted: #6e6e73; --rule: rgba(0,0,0,.12);
-      --code-bg: rgba(0,0,0,.04); --inline-code-bg: rgba(0,0,0,.055); --link: #1c7ed6 }
-    @media (prefers-color-scheme: dark) { :root { --bg: #1e1e1f; --fg: #ececee; --muted: #a1a1a6;
-      --rule: rgba(255,255,255,.14); --code-bg: rgba(255,255,255,.05); --inline-code-bg: rgba(255,255,255,.075); --link: #4dabf7 } }
+    :root { color-scheme: light dark; --bg: #f4f5f9; --fg: #252933; --muted: #555e71; --rule: rgba(0,0,0,.12);
+      --code-bg: rgba(0,0,0,.04); --inline-code-bg: rgba(0,0,0,.055); --link: #455b7b }
+    @media (prefers-color-scheme: dark) { :root { --bg: #191b20; --fg: #e9edf4; --muted: #b5b8c2;
+      --rule: rgba(255,255,255,.14); --code-bg: rgba(255,255,255,.05); --inline-code-bg: rgba(255,255,255,.075); --link: #c0cfe7 } }
     html { background: var(--bg) }
     html, body { margin: 0 }
     body { padding: 24px; color: var(--fg); font: 15px/1.55 -apple-system, BlinkMacSystemFont, sans-serif;
@@ -176,7 +176,9 @@ final class NoteSnapshot: NSObject, WKNavigationDelegate {
     li:has(> input[type=checkbox]) { list-style: none }
     li > input[type=checkbox] { appearance: none; width: 14px; height: 14px; margin: 0 .5em 0 -1.35em; vertical-align: -2px;
       border: 1.3px solid var(--muted); border-radius: 4px; box-sizing: border-box }
-    li > input[type=checkbox]:checked { background: #4dabf7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2l2.3 2.3 4.7-5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100%; border-color: #4dabf7 }
+    li > input[type=checkbox]:checked { background: var(--link); border-color: var(--link) }
+    li > input[type=checkbox]:checked::after { content: ""; display: block; width: 6px; height: 3px; margin: 3px 2px;
+      border: solid var(--bg); border-width: 0 0 2px 2px; transform: rotate(-45deg) }
     a { color: var(--link); text-decoration-color: color-mix(in srgb, var(--link) 35%, transparent); text-underline-offset: 2px }
     code { font: .86em ui-monospace, 'SF Mono', Menlo, monospace; background: var(--inline-code-bg); border-radius: 4px; padding: .12em .32em }
     pre { background: var(--code-bg); border-radius: 8px; padding: 12px 14px; white-space: pre-wrap }

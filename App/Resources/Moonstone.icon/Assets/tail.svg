@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128">
+  <title>Lower wing</title>
+  <defs>
+    <linearGradient id="face" x1="47" y1="77" x2="50" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FB8D72"/><stop offset="1" stop-color="#FFB99B"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#face)" d="M45 77 83 72 30 106z"/>
+</svg>
