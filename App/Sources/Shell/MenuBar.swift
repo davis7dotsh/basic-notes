@@ -21,8 +21,9 @@ final class MenuBar: NSObject, NSMenuDelegate {
         self.actions = actions
         super.init()
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Basic Notes")
+            let image = NSImage(named: "StatusIcon")
             image?.isTemplate = true
+            image?.accessibilityDescription = "Basic Notes"
             button.image = image
         }
         let menu = NSMenu()
