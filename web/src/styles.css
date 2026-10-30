@@ -484,12 +484,12 @@ body {
 #app .cm-vim-panel span + span {
   display: none;
 }
-/* Vim messages float at bottom center without moving the editor or covering the mode indicator. */
+/* Vim messages float above the mode indicator, centered without moving the editor. */
 #app .cm-panels-bottom:has(.cm-vim-message) {
   position: absolute;
   left: 50%;
   right: auto;
-  bottom: 12px;
+  bottom: 40px;
   transform: translateX(-50%);
   width: max-content;
   max-width: calc(100% - 24px);
