@@ -26,6 +26,7 @@ func render(_ px: Int, canvas: CGFloat = 1024, draw: () -> Void) -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     let ctx = NSGraphicsContext.current!.cgContext
+    ctx.clear(CGRect(x: 0, y: 0, width: px, height: px))
     ctx.translateBy(x: 0, y: CGFloat(px))
     let scale = CGFloat(px) / canvas
     ctx.scaleBy(x: scale, y: -scale)
