@@ -484,12 +484,15 @@ body {
 #app .cm-vim-panel span + span {
   display: none;
 }
-/* vim's transient messages ("3 lines yanked"): a quiet note in the corner that fades, not a red panel. */
+/* Vim messages float at bottom center without moving the editor or covering the mode indicator. */
 #app .cm-panels-bottom:has(.cm-vim-message) {
   position: absolute;
-  left: auto;
-  right: 8px;
-  bottom: 6px;
+  left: 50%;
+  right: auto;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
   border: 0;
   background: transparent;
   pointer-events: none;
@@ -504,7 +507,9 @@ body {
   padding: 2px 5px;
   border-radius: 4px;
   background: var(--bg);
-  white-space: nowrap !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  text-align: center;
   animation: vim-message 2.2s ease forwards;
 }
 @keyframes vim-message {
