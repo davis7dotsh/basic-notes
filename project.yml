@@ -1,0 +1,65 @@
+name: BasicNotes
+options:
+  bundleIdPrefix: sh.davis7
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    ENABLE_HARDENED_RUNTIME: NO
+    OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -DACCELERATE_NEW_LAPACK"
+targets:
+  BasicNotes:
+    type: application
+    platform: macOS
+    sources:
+      - path: App/Sources
+      - path: App/Resources/Web
+        type: folder
+        buildPhase: resources
+      - path: App/Resources/Models
+        type: folder
+        buildPhase: resources
+      - path: App/Resources/Assets.xcassets
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Basic Notes
+        CFBundleName: BasicNotes
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "15.0"
+        NSHumanReadableCopyright: ""
+        CFBundleURLTypes:
+          - CFBundleURLName: sh.davis7.basicnotes
+            CFBundleURLSchemes: [basicnotes]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: sh.davis7.basicnotes
+        PRODUCT_NAME: BasicNotes
+        INFOPLIST_KEY_CFBundleDisplayName: Basic Notes
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: App/BasicNotes.entitlements
+        ENABLE_APP_SANDBOX: NO
+  # Store/Search eval harness (owned by the Store/Search agent): scripts/eval.sh
+  SearchEval:
+    type: tool
+    platform: macOS
+    sources:
+      - path: App/Sources/Search
+      - path: App/Sources/Store
+      - path: App/Sources/Core
+      - path: App/Sources/Shell/Log.swift
+      - path: tools/SearchEval
+    settings:
+      base:
+        PRODUCT_NAME: SearchEval
+        SWIFT_OPTIMIZATION_LEVEL: -O

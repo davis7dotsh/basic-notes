@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# nbm — drive a running Basic Notes instance started with NBM_AUTOMATION=1 (see docs/automation.md).
+# Port: $NBM_AUTOMATION_PORT (default 47823).
+set -euo pipefail
+BASE="http://127.0.0.1:${NBM_AUTOMATION_PORT:-47823}"
+
+get() { curl -sS --max-time 30 "$BASE$1"; }
+post() { curl -sS --max-time 60 -X POST -H 'Content-Type: application/json' --data-binary "$2" "$BASE$1"; }
+action() { if [[ $# -gt 1 ]]; then post /action "$(jq -nc --arg n "$1" --arg v "$2" '{name:$n, value:($v|try fromjson catch $v)}')"; else post /action "$(jq -nc --arg n "$1" '{name:$n}')"; fi; }
+abspath() { [[ $1 = /* ]] && echo "$1" || echo "$PWD/$1"; }
+
+usage() {
+  cat <<'USAGE'
+nbm state                      panel/app/note/settings/web state (JSON)
+nbm snap [out.png] [scale]     PNG of the panel (strip + editor); default /tmp/nbm-snap.png
+nbm snap-settings [out.png]    PNG of the settings window (open it with `nbm settings`)
+nbm js "<expr or body>"        evaluate in the page (expressions auto-return; use return/await for bodies)
+nbm key cmd+shift+c            one key combo (cmd/shift/alt/ctrl + key; names: esc return tab space backspace up down left right home end pageup pagedown f1…)
+nbm keys esc j j d d           a sequence of combos
+nbm type "hello\nworld"        type text (\n = return); non-ASCII falls back to insertText
+nbm click X Y [right] [count]  click in panel content coords (top-left origin, points)
+nbm show|hide|toggle|new|search|settings|close-settings|reload|quit
+nbm open <note-id>
+nbm action <name> [value]      raw action (setVim true, setHideFromCapture false, setNotesDir /path, url basicnotes://new)
+nbm vim on|off                 toggle vim mode
+nbm paste-image <file>         put image data on the clipboard (like a screenshot)
+nbm paste-file <file>          put a file URL on the clipboard (like Finder copy)
+nbm set-clipboard "<text>" [html]
+nbm pasteboard [full]          clipboard types/sizes/string/html (+ data-URI image counts)
+nbm resize W H                 resize panel (top-anchored, persisted)
+nbm logs [n]                   recent app log lines
+nbm url basicnotes://toggle  fire a deeplink through LaunchServices (open -g)
+nbm wait [seconds]             wait until the server answers
+USAGE
+}
+
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  state) get /state ;;
+  snap|snapshot)
+    out="${1:-/tmp/nbm-snap.png}"; scale="${2:-1}"
+    curl -sS --max-time 30 -f -o "$out" "$BASE/snapshot?scale=$scale" && echo "$out" ;;
+  snap-settings)
+    out="${1:-/tmp/nbm-settings.png}"; scale="${2:-1}"
+    curl -sS --max-time 30 -f -o "$out" "$BASE/snapshot?scale=$scale&window=settings" && echo "$out" ;;
+  js) post /js "$(jq -nc --arg c "$*" '{code:$c}')" ;;
+  key) post /key "$(jq -nc --arg c "$1" '{combo:$c}')" ;;
+  keys) post /keys "$(jq -nc '{sequence:$ARGS.positional}' --args "$@")" ;;
+  type) t="$(printf '%b.' "$*")"; post /type "$(jq -nc --arg t "${t%.}" '{text:$t}')" ;;
+  click)
+    btn="${3:-left}"; count="${4:-1}"
+    post /click "$(jq -nc --argjson x "$1" --argjson y "$2" --arg b "$btn" --argjson c "$count" '{x:$x,y:$y,button:$b,clickCount:$c}')" ;;
+  show|hide|toggle|new|search|settings|reload|quit) action "$cmd" ;;
+  close-settings) action closeSettings ;;
+  open) action open "$1" ;;
+  action) action "$@" ;;
+  vim) action setVim "$([[ ${1:-on} == on ]] && echo true || echo false)" ;;
+  paste-image) post /pasteboard "$(jq -nc --arg p "$(abspath "$1")" '{imagePath:$p}')" ;;
+  paste-file) post /pasteboard "$(jq -nc --arg p "$(abspath "$1")" '{filePath:$p}')" ;;
+  set-clipboard)
+    if [[ $# -gt 1 ]]; then post /pasteboard "$(jq -nc --arg t "$1" --arg h "$2" '{text:$t,html:$h}')"
+    else post /pasteboard "$(jq -nc --arg t "$1" '{text:$t}')"; fi ;;
+  pasteboard) if [[ "${1:-}" == full ]]; then get "/pasteboard?full=1"; else get /pasteboard; fi ;;
+  resize) post /resize "$(jq -nc --argjson w "$1" --argjson h "$2" '{width:$w,height:$h}')" ;;
+  logs) get "/logs?n=${1:-100}" | jq -r '.lines[]' ;;
+  url) open -g "$1" ;;
+  wait)
+    for _ in $(seq 1 $(( ${1:-15} * 10 ))); do curl -s --max-time 1 "$BASE/state" >/dev/null 2>&1 && exit 0; sleep 0.1; done
+    echo "nbm: server not answering at $BASE" >&2; exit 1 ;;
+  help|-h|--help) usage ;;
+  *) echo "nbm: unknown command $cmd" >&2; usage >&2; exit 2 ;;
+esac

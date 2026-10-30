@@ -1,0 +1,21 @@
+[
+  {"q": "call mom about flights", "expect": "todo-this-week", "category": "multi_term"},
+  {"q": "houseplant watering", "expect": "plant-care", "category": "multi_term"},
+  {"q": "conference talk proposal offline apps", "expect": "talk-abstract-local-first", "category": "multi_term"},
+  {"q": "set thermostat before trip", "expect": "todo-before-lisbon", "category": "multi_term_guard"},
+  {"q": "gift for mom dutch oven", "expect": "gift-ideas", "category": "multi_term_guard"},
+  {"q": "teflon tape and deck screws", "expect": "home-depot-list", "category": "multi_term_guard"},
+  {"q": "tabs versus spaces debate", "expect": "podcast-topics", "category": "multi_term_guard"},
+  {"q": "rank github repos by stars", "expect": "shower-thoughts", "category": "multi_term_guard"},
+  {"q": "pomodoro doing nothing", "expect": "shower-thoughts", "category": "multi_term_guard"},
+  {"q": "vps stack with caddy", "expect": "video-ideas-backlog", "category": "multi_term_guard"},
+  {"q": "white uniqlo shirts", "expect": "packing-list", "category": "multi_term_guard"},
+  {"q": "zzqq unique phrase nine", "category": "none"},
+  {"q": "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x coffee", "allow": ["coffee-ratio", "grocery-list", "half-marathon-plan", "podcast-ep48-notes"], "category": "flood"},
+  {"q": "q z x v k j", "category": "none"},
+  {"q": "waffle recipe friday r3", "category": "none"},
+  {"q": "subscriber growth", "expect": "youtube-analytics-oct", "category": "short_concept"},
+  {"q": "grading every programming assistant head to head", "max": 5, "category": "flood"},
+  {"q": "pumping iron progress", "max": 5, "category": "flood"},
+  {"q": "waffle recipe friday", "max": 5, "category": "flood"}
+]

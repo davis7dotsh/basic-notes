@@ -1,0 +1,838 @@
+/* Basic Notes — web UI. Black/white with a #4DABF7 accent; follows the system appearance.
+   The page itself is transparent: the panel's native glass + tint shows through (one surface with the native header).
+   --bg is the opaque equivalent, for small chips that sit over text. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #86868b;
+  --faint: #b4b4b9;
+  --quote: #5f5f64;
+  --border: rgba(0, 0, 0, 0.08);
+  --rule: rgba(0, 0, 0, 0.12);
+  --code-bg: rgba(0, 0, 0, 0.035);
+  --inline-code-bg: rgba(0, 0, 0, 0.055);
+  --hover: rgba(0, 0, 0, 0.045);
+  --row-selected: rgba(0, 0, 0, 0.06);
+  --accent: #4dabf7;
+  --link: #1c7ed6;
+  --selection: rgba(77, 171, 247, 0.24);
+  --highlight: rgba(77, 171, 247, 0.22);
+  --search-match: rgba(77, 171, 247, 0.28);
+  --cursor: #1d1d1f;
+  --vim-cursor: #4dabf7;
+  --vim-cursor-fg: #0b1a26;
+  --toast-bg: #f2f2f4;
+  --toast-fg: #1d1d1f;
+  --toast-border: rgba(0, 0, 0, 0.08);
+  --danger: #d9534f;
+  --checkbox-border: #c2c2c7;
+
+  --syn-keyword: #a626a4;
+  --syn-string: #2b8a3e;
+  --syn-regexp: #c2255c;
+  --syn-number: #c26a00;
+  --syn-comment: #9a9aa0;
+  --syn-function: #1c7ed6;
+  --syn-type: #0c8599;
+  --syn-property: #364fc7;
+  --syn-tag: #c92a2a;
+  --syn-meta: #868e96;
+  --syn-definition: #1d1d1f;
+  --syn-invalid: #e03131;
+
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  --pad-x: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1f;
+    --fg: #ececee;
+    --muted: #8e8e93;
+    --faint: #5a5a5f;
+    --quote: #a1a1a6;
+    --border: rgba(255, 255, 255, 0.08);
+    --rule: rgba(255, 255, 255, 0.14);
+    --code-bg: rgba(255, 255, 255, 0.045);
+    --inline-code-bg: rgba(255, 255, 255, 0.075);
+    --hover: rgba(255, 255, 255, 0.05);
+    --row-selected: rgba(255, 255, 255, 0.075);
+    --link: #4dabf7;
+    --selection: rgba(77, 171, 247, 0.3);
+    --highlight: rgba(77, 171, 247, 0.26);
+    --search-match: rgba(77, 171, 247, 0.32);
+    --cursor: #ececee;
+    --vim-cursor: #4dabf7;
+    --vim-cursor-fg: #0b1a26;
+    --toast-bg: #2c2c2e;
+    --toast-fg: #ececee;
+    --toast-border: rgba(255, 255, 255, 0.08);
+    --danger: #e5736f;
+    --checkbox-border: #636366;
+
+    --syn-keyword: #d0a3ff;
+    --syn-string: #8ce99a;
+    --syn-regexp: #faa2c1;
+    --syn-number: #ffc078;
+    --syn-comment: #6e6e73;
+    --syn-function: #74c0fc;
+    --syn-type: #66d9e8;
+    --syn-property: #bac8ff;
+    --syn-tag: #ff8787;
+    --syn-meta: #909296;
+    --syn-definition: #ececee;
+    --syn-invalid: #ff6b6b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--fg);
+  font: 15px/1.6 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.editor-host {
+  position: relative;
+  height: 100%;
+}
+/* Scrolled: text fades out under the native header instead of being sliced flush at the edge. */
+.editor-host.scrolled .cm-scroller {
+  mask-image: linear-gradient(transparent, #000 12px);
+}
+/* An overlay (⌘P, ⌘K) covers the note: it sits on the same glass, so the note behind it goes away. */
+#app:has(> .search:not([hidden], .pending)) .editor-host {
+  visibility: hidden;
+}
+
+/* ---------------- editor ---------------- */
+
+#app .cm-editor {
+  height: 100%;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+}
+#app .cm-editor.cm-focused {
+  outline: none;
+}
+#app .cm-scroller {
+  /* Horizontal padding lives here (not on .cm-content) so selections never bleed into the margins. */
+  padding: 0 var(--pad-x);
+  font-family: var(--font);
+  line-height: 1.6;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#app .cm-content {
+  padding: 4px 0 48px;
+  caret-color: var(--cursor);
+  -webkit-user-select: text;
+  user-select: text;
+}
+#app .cm-line {
+  padding: 0;
+}
+/* Blink is timer-driven (editor.ts): no perpetual CSS animation; its own layer so a flip is just an opacity commit. */
+#app .cm-editor .cm-cursorLayer {
+  animation: none !important;
+  will-change: opacity;
+}
+#app .cm-editor.cm-caret-off .cm-cursorLayer {
+  opacity: 0;
+}
+#app .cm-cursor,
+#app .cm-dropCursor {
+  border-left: 2px solid var(--cursor);
+  margin-left: -1px;
+}
+#app .cm-dropCursor {
+  border-left-color: var(--accent);
+}
+#app .cm-selectionBackground,
+#app .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
+#app .cm-content ::selection {
+  background: var(--selection);
+}
+#app .cm-placeholder {
+  color: var(--faint);
+}
+
+/* Revealed markup on the line being edited */
+#app .cm-md-mark,
+#app .cm-md-mark * {
+  color: var(--faint);
+  font-weight: inherit;
+}
+
+/* headings */
+#app .cm-h {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+#app .cm-h1 {
+  font-size: 1.6em;
+  line-height: 1.3;
+  padding-top: 0.25em;
+  padding-bottom: 0.1em;
+  letter-spacing: -0.02em;
+}
+#app .cm-h2 {
+  font-size: 1.3em;
+  line-height: 1.35;
+  padding-top: 0.25em;
+  padding-bottom: 0.05em;
+}
+#app .cm-h3 {
+  font-size: 1.1em;
+  line-height: 1.45;
+  padding-top: 0.2em;
+}
+#app .cm-h4 {
+  font-size: 1em;
+}
+#app .cm-setext-underline {
+  font-size: 0.85em;
+}
+#app .cm-setext-collapsed {
+  height: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+
+/* inline code */
+#app .cm-inline-code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--inline-code-bg);
+  border-radius: 4px;
+  padding: 0.12em 0.32em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* links */
+#app .cm-link,
+#app .cm-link * {
+  color: var(--link);
+}
+#app .cm-link {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--link) 35%, transparent);
+  text-underline-offset: 2px;
+}
+/* ⌘-click opens; plain click edits. */
+.cmd-held #app .cm-link {
+  cursor: pointer;
+}
+
+/* lists */
+#app .cm-bullet {
+  display: inline-block;
+  width: 1.5em;
+  text-indent: 0;
+  position: relative;
+  height: 1em;
+  vertical-align: baseline;
+}
+#app .cm-bullet::after {
+  content: '';
+  position: absolute;
+  left: 0.32em;
+  top: 50%;
+  width: 0.34em;
+  height: 0.34em;
+  margin-top: -0.05em;
+  border-radius: 50%;
+  background: var(--fg);
+  opacity: 0.75;
+}
+#app .cm-bullet-1::after {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.3px var(--fg);
+}
+#app .cm-bullet-2::after {
+  border-radius: 1px;
+  width: 0.3em;
+  height: 0.3em;
+}
+#app .cm-li-raw {
+  display: inline-block;
+  text-indent: 0;
+  white-space: pre;
+}
+#app .cm-li-raw-bullet {
+  min-width: 1.5em;
+}
+#app .cm-li-raw-task {
+  /* `- [ ] ` squeezed into the checkbox's 1.5em so the item text doesn't move when it's revealed. */
+  font-size: 0.86em;
+  min-width: calc(1.5em / 0.86);
+  letter-spacing: -0.07em;
+}
+#app .cm-ol-box {
+  display: inline-block;
+  text-indent: 0;
+  white-space: pre;
+  text-align: right;
+}
+#app .cm-ol-marker {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+#app .cm-task-box {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 1.04em;
+  height: 1.04em;
+  margin-right: 0.46em;
+  vertical-align: -0.16em;
+  border: 1.5px solid var(--checkbox-border);
+  border-radius: 0.3em;
+  cursor: pointer;
+  text-indent: 0;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+#app .cm-task-box:hover {
+  border-color: var(--accent);
+}
+#app .cm-task-box svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+#app .cm-task-box-checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#app .cm-task-box-checked svg {
+  opacity: 1;
+}
+#app .cm-task-done {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--faint);
+}
+
+/* blockquote */
+#app .cm-quote {
+  border-left: 3px solid var(--rule);
+  padding-left: 14px;
+  color: var(--quote);
+}
+
+/* horizontal rule */
+#app .cm-hr {
+  position: relative;
+}
+#app .cm-hr::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--rule);
+}
+
+/* fenced code */
+#app .cm-codeblock {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--code-bg);
+  padding: 0 14px;
+  position: relative;
+}
+#app .cm-codeblock-begin {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  padding-top: 3px;
+}
+#app .cm-codeblock-end {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  padding-bottom: 3px;
+}
+#app .cm-code-lang {
+  position: absolute;
+  right: 12px;
+  top: 3px;
+  font-family: var(--font);
+  font-size: 11px;
+  line-height: 20.8px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* images */
+#app .cm-image-line {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+#app .cm-image-block {
+  padding: 4px 0 8px;
+  margin-left: var(--image-indent, 0);
+  line-height: 0;
+  cursor: default;
+}
+/* Inside a quote: the quote's border and gutter (as on .cm-quote lines) run through the image; a list indent sits inside it. */
+#app .cm-image-quoted {
+  margin-left: 0;
+  border-left: 3px solid var(--rule);
+  padding-left: calc(14px + var(--image-indent, 0px));
+}
+#app .cm-image-failed {
+  padding-top: 2px;
+  padding-bottom: 6px;
+}
+#app .cm-image-block img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--border);
+  object-fit: contain;
+}
+#app .cm-image-loading img {
+  min-height: 120px;
+  min-width: 160px;
+  background: var(--code-bg);
+}
+#app .cm-image-error {
+  display: block;
+  width: fit-content;
+  line-height: 1.6;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--code-bg);
+}
+
+/* ---------------- vim ---------------- */
+
+/* Normal-mode block: a solid accent block with the character readable on top (min width so it's still a
+   block on an empty line or at a line end). */
+#app .cm-editor .cm-vimCursorLayer .cm-fat-cursor {
+  background: var(--vim-cursor);
+  color: var(--vim-cursor-fg) !important;
+  border-radius: 2px;
+  min-width: 0.55em;
+}
+#app .cm-editor:not(.cm-focused) .cm-vimCursorLayer .cm-fat-cursor {
+  background: none;
+  outline: 1px solid var(--vim-cursor);
+  color: transparent !important;
+}
+#app .cm-panels {
+  background: transparent;
+  color: var(--fg);
+}
+#app .cm-panels-bottom {
+  border-top: 1px solid var(--border);
+}
+#app .cm-vim-panel {
+  padding: 7px var(--pad-x) 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 20px;
+  min-height: 0;
+  align-items: center;
+}
+#app .cm-vim-panel input {
+  font: inherit;
+  color: var(--fg);
+  caret-color: var(--accent);
+  padding: 0 0 0 2px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#app .cm-vim-panel span {
+  color: var(--muted);
+  font-family: var(--mono) !important;
+}
+/* vim's "(JavaScript regexp: set pcre)" hint — no explanatory subtext. */
+#app .cm-vim-panel span + span {
+  display: none;
+}
+/* vim's transient messages ("3 lines yanked"): a quiet note in the corner that fades, not a red panel. */
+#app .cm-panels-bottom:has(.cm-vim-message) {
+  position: absolute;
+  left: auto;
+  right: 8px;
+  bottom: 6px;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+  z-index: 6;
+}
+#app .cm-panels-bottom:has(.cm-vim-message) .cm-vim-panel {
+  padding: 0;
+}
+#app .cm-vim-message {
+  color: var(--muted) !important;
+  font: 11px/1 var(--font);
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+  white-space: nowrap !important;
+  animation: vim-message 2.2s ease forwards;
+}
+@keyframes vim-message {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+#app .cm-searchMatch {
+  background: var(--search-match);
+  border-radius: 2px;
+}
+
+.vim-mode {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--toast-bg);
+  box-shadow: 0 0 0 0.5px var(--toast-border);
+  font: 500 11px/1 var(--font);
+  color: var(--faint);
+  pointer-events: none;
+  z-index: 5;
+  transition:
+    color 150ms ease,
+    opacity 150ms ease;
+}
+/* Mid-scroll the label would sit on text: Normal (the block cursor already says so) steps aside;
+   Insert/Visual are worth the corner. */
+.vim-mode.away[data-mode='normal'] {
+  opacity: 0;
+}
+.vim-mode[data-mode='insert'] {
+  color: var(--accent);
+}
+.vim-mode[data-mode='visual'] {
+  color: var(--muted);
+}
+.searching .vim-mode {
+  display: none;
+}
+/* The vim prompt panel owns the bottom edge while it's open. */
+#app:has(.cm-panels-bottom .cm-vim-panel input) .vim-mode {
+  display: none;
+}
+
+/* ---------------- search overlay ---------------- */
+
+.search {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+.search[hidden] {
+  display: none;
+}
+/* ⌘P before its first results: already focused (catches type-ahead), not shown yet. */
+.search.pending {
+  opacity: 0;
+}
+.search-field {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px var(--pad-x) 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.search-field svg {
+  flex: none;
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg);
+  font: 17px/26px var(--font);
+  padding: 0;
+  caret-color: var(--accent);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.search-field input::placeholder {
+  color: var(--faint);
+}
+.search-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 8px;
+}
+.search-row {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 8px;
+  cursor: default;
+}
+.search-row.selected {
+  background: var(--row-selected);
+}
+.search-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.search-row-title,
+.search-row-snippet {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.search-row-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 560;
+}
+.search-row-snippet {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.search-row-tag {
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.search-row mark {
+  background: var(--highlight);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  margin: 0 -1px;
+}
+.search-row-snippet mark {
+  color: var(--fg);
+}
+.search-row-meta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.search-row-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+}
+.search-row-pin svg {
+  color: var(--accent);
+}
+.search-row-time {
+  min-width: 2.2em;
+  text-align: right;
+}
+.search-create-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--muted);
+  margin-right: -2px;
+}
+.search-create .search-row-main {
+  color: var(--muted);
+  font-weight: 450;
+}
+.search-create-query {
+  color: var(--fg);
+  font-weight: 560;
+}
+.search-create-hint {
+  color: var(--faint);
+}
+.search-create.selected .search-create-hint {
+  color: var(--muted);
+}
+.search-empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------------- action menu (⌘K) ---------------- */
+/* Reuses the search overlay's shell (.search, .search-field, .search-list); only rows and sections are its own. */
+
+.actions-list {
+  position: relative; /* offsetTop for scrolling the selection into view */
+}
+.actions-section {
+  padding: 10px 12px 4px;
+  font-size: 11.5px;
+  line-height: 16px;
+  font-weight: 560;
+  color: var(--muted);
+}
+.actions-section:first-child {
+  padding-top: 2px;
+}
+.actions-row {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 12px;
+  border-radius: 7px;
+  font-size: 13.5px;
+  cursor: default;
+}
+.actions-row.selected {
+  background: var(--row-selected);
+}
+.actions-row-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.actions-row mark {
+  background: var(--highlight);
+  color: inherit;
+  border-radius: 3px;
+}
+.actions-keys {
+  flex: none;
+  display: flex;
+  gap: 3px;
+}
+.actions-keys kbd {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--hover);
+  color: var(--muted);
+  font: 500 11px/18px var(--font);
+  text-align: center;
+}
+.actions-row.selected kbd {
+  color: var(--fg);
+}
+/* Like ⌘P: the menu covers the note (same glass), so the note behind it goes away. */
+.actions-open .editor-host {
+  visibility: hidden;
+}
+.actions-open .vim-mode,
+.actions-open .unsaved {
+  display: none;
+}
+
+/* ---------------- toast ---------------- */
+
+/* Lives in the editor's bottom padding (48px), so it never covers the last line of text. */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translate(-50%, 3px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  font: 500 12px/16px var(--font);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  box-shadow:
+    0 0 0 0.5px var(--toast-border),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.toast[data-tone='error']::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Persistent while edits haven't reached disk. Takes the vim label's corner (it matters more). */
+.unsaved {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--toast-bg);
+  box-shadow: 0 0 0 0.5px var(--toast-border);
+  font: 500 11px/1 var(--font);
+  color: var(--danger);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.unsaved.show {
+  opacity: 1;
+}
+.searching .unsaved,
+.has-unsaved .vim-mode {
+  display: none;
+}

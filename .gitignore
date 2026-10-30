@@ -1,0 +1,11 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj/
+web/node_modules/
+web/dist/
+App/Resources/Web/
+.venv/
+models-src/
+# Embedding model artifacts (scripts/fetch-model.sh)
+App/Resources/Models/*/

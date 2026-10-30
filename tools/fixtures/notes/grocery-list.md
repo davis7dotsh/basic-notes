@@ -1,0 +1,22 @@
+# grocery list
+
+- [ ] eggs (2 dozen)
+- [ ] whole milk
+- [ ] greek yogurt — big tub, plain
+- [ ] chicken thighs bone-in ~3lb
+- [ ] ground beef 80/20 x2
+- [ ] potato buns
+- [ ] american cheese slices
+- [ ] onions (yellow x3, red x1)
+- [ ] garlic
+- [ ] ginger
+- [ ] cilantro
+- [ ] limes
+- [ ] bananas
+- [ ] berries if on sale
+- [ ] spinach
+- [ ] rice — basmati
+- [ ] coffee beans (the onyx one)
+- [ ] la croix pamplemousse
+- [x] olive oil
+- [x] paper towels
