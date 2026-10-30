@@ -454,8 +454,8 @@ final class Coordinator {
         case .search(let query):
             let hits = await search.search(query, context: rankingContext())
             return .success(Self.jsonObject(hits))
-        case .headingVisible(let id, let visible):
-            if id == currentID { panel.strip.setHeadingVisible(visible) }
+        case .headingVisible(let id, let endLine):
+            if id == currentID { panel.strip.setVisibleHeading(through: endLine) }
             return .success(nil)
         case .open(let id, let passage):
             navigate(.note(id, passage: passage))
@@ -479,7 +479,7 @@ final class Coordinator {
         case .togglePin(let id):
             let index = state.togglePin(id)
             web.send(.pinState(id: id, pinned: index != nil, pinIndex: index))
-            if id == currentID { panel.setStrip(pinned: index != nil) }
+            if id == currentID { panel.strip.setPinned(index != nil) }
             return .success(["pinned": index != nil, "pinIndex": index.map { $0 as Any } ?? NSNull()])
         case .copyNote(_, let markdown, let html, let images):
             var output = ClipboardExport.build(markdown: markdown, html: html, images: images, folder: store.folder) { [store] in store.resolve(relativePath: $0) }
@@ -608,6 +608,7 @@ final class Coordinator {
         }
         if id == currentID {
             currentContent = content
+            panel.setStrip(content: content)
             if currentIsNew && content.isBlank { return .success(["ok": true]) }
         } else if !store.exists(id), content.isBlank || trashedIDs.contains(id) {
             // Late save for a note we trashed, or one that's gone and had nothing to keep — don't resurrect it.
@@ -629,7 +630,6 @@ final class Coordinator {
             }
             if id == currentID {
                 currentIsNew = false
-                panel.setStrip(title: content.isBlank ? "" : result.meta.title)
             }
             knownIDs.insert(id)
             state.recordEdit(id)
@@ -738,6 +738,7 @@ final class Coordinator {
         }
         renamed[id] = nil  // once the editor shows this id, its saves mean this id
         presentedIDs.insert(id)
+        if id != currentID { panel.strip.resetHeadingVisibility() }
         currentID = id
         currentIsNew = isNew
         currentContent = content
@@ -748,7 +749,7 @@ final class Coordinator {
             viewState: isNew ? nil : state.viewState(for: id),
             canGoBack: state.canGoBack, canGoForward: state.canGoForward, folder: folderKey, passage: passage)))
         web.send(.navState(canGoBack: state.canGoBack, canGoForward: state.canGoForward))
-        panel.setStrip(title: content.isBlank ? "" : NoteTitle.from(content), pinned: pin != nil)
+        panel.setStrip(content: content, pinned: pin != nil)
         // Showing text that couldn't go into the (restored) folder yet (see `editorText`): it's the editor's now.
         if !isNew, !folderMissing, resaves[id] != nil {
             overRestored.insert(id)
@@ -956,7 +957,7 @@ final class Coordinator {
         case true?:
             store.acknowledge(id, content: disk)
             currentContent = disk
-            panel.setStrip(title: disk.isBlank ? "" : NoteTitle.from(disk))
+            panel.setStrip(content: disk)
             Log.info("applied external change to \(id)")
         case false?:
             // Editor has unsaved edits: it wins, the disk version is kept as a separate note.

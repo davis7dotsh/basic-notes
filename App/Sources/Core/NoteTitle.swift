@@ -7,14 +7,18 @@ nonisolated enum NoteTitle {
         firstTitle(in: content)?.text ?? "Untitled"
     }
 
-    static func firstTitle(in content: String) -> (source: Substring, text: String)? {
+    static func firstTitle(in content: String) -> (source: Substring, text: String, line: Int)? {
         // Line by line up to the first title line (not `split`, which cuts up a whole long note on every save).
         var rest = content[...]
+        var lineNumber = 1
         while !rest.isEmpty {
             let end = rest.firstIndex(where: \.isNewline) ?? rest.endIndex
             let raw = rest[..<end]
-            if !raw.isEmpty, let line = text(ofLine: raw), !line.isEmpty { return (raw, line) }
-            rest = end == rest.endIndex ? "" : rest[rest.index(after: end)...]
+            if !raw.isEmpty, let line = text(ofLine: raw), !line.isEmpty { return (raw, line, lineNumber) }
+            guard end < rest.endIndex else { break }
+            // CodeMirror counts CR, LF and CRLF as line breaks.
+            if rest[end] == "\n" || rest[end] == "\r" || rest[end] == "\r\n" { lineNumber += 1 }
+            rest = rest[rest.index(after: end)...]
         }
         return nil
     }

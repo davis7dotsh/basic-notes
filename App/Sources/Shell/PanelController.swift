@@ -98,9 +98,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// The header's icon buttons.
     var onHeaderAction: ((HeaderAction) -> Void)?
 
-    func setStrip(title: String, pinned: Bool) { strip.update(title: title, pinned: pinned) }
-    func setStrip(title: String) { strip.update(title: title, pinned: strip.isPinned) }
-    func setStrip(pinned: Bool) { strip.update(title: strip.title, pinned: pinned) }
+    func setStrip(content: String, pinned: Bool? = nil) {
+        let title = NoteTitle.firstTitle(in: content)
+        strip.update(title: title?.text ?? (content.isBlank ? "" : "Untitled"), titleLine: title?.line)
+        if let pinned { strip.setPinned(pinned) }
+    }
 
     func applyCaptureSetting() {
         let wanted: NSWindow.SharingType = prefs.hideFromCapture ? .none : .readOnly

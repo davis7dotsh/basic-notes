@@ -133,6 +133,9 @@ final class DragStrip: NSView {
     private let pin = NSImageView()
     private let lights = TrafficLights()
     private(set) var title = ""
+    private var titleLine: Int?
+    private var visibleHeadingEndLine = 0
+    private var titleFaded = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -183,7 +186,7 @@ final class DragStrip: NSView {
             titleStack.leadingAnchor.constraint(greaterThanOrEqualTo: lights.trailingAnchor, constant: 8),
             titleStack.trailingAnchor.constraint(lessThanOrEqualTo: pill.leadingAnchor, constant: -8),
         ])
-        update(title: "", pinned: false)
+        update(title: "", titleLine: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
@@ -212,14 +215,32 @@ final class DragStrip: NSView {
         return pill
     }
 
-    func update(title: String, pinned: Bool) {
+    func setPinned(_ pinned: Bool) { pin.isHidden = !pinned }
+
+    func update(title: String, titleLine: Int?) {
         self.title = title
+        self.titleLine = titleLine
         label.stringValue = title.isEmpty ? "Untitled" : title
-        pin.isHidden = !pinned
+        updateTitleVisibility()
     }
 
-    func setHeadingVisible(_ visible: Bool) {
-        let alpha: CGFloat = visible ? 0 : 1
+    func resetHeadingVisibility() {
+        visibleHeadingEndLine = 0
+        titleFaded = false
+        label.alphaValue = 1
+    }
+
+    func setVisibleHeading(through endLine: Int) {
+        visibleHeadingEndLine = endLine
+        updateTitleVisibility()
+    }
+
+    private func updateTitleVisibility() {
+        // An empty or image-only heading can precede the actual title elsewhere in the note.
+        let fade = titleLine.map { $0 <= visibleHeadingEndLine } ?? false
+        guard fade != titleFaded else { return }
+        titleFaded = fade
+        let alpha: CGFloat = fade ? 0 : 1
         NSAnimationContext.runAnimationGroup { context in
             context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.15
             label.animator().alphaValue = alpha

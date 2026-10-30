@@ -26,7 +26,7 @@ host.className = 'editor-host'
 app.appendChild(host)
 
 type Session = {
-  headingVisible?: boolean
+  visibleHeadingEndLine?: number
   id: NoteId
   isNew: boolean
   /** Content known to be on disk. */
@@ -65,18 +65,21 @@ const log = (level: 'debug' | 'info' | 'warn' | 'error', message: string) => voi
 // block, including wrapped rows, in the same layout pass as CodeMirror's viewport.
 const headingMeasure = {
   read(editor: EditorView) {
-    if (!session || search.isOpen() || menu.isOpen()) return false
+    if (!session || search.isOpen() || menu.isOpen()) return 0
     const heading = syntaxTree(editor.state).topNode.firstChild
-    if (!heading || !/^(ATX|Setext)Heading[1-6]$/.test(heading.name)) return false
+    if (!heading || !/^(ATX|Setext)Heading[1-6]$/.test(heading.name)) return 0
     const viewport = editor.scrollDOM.getBoundingClientRect()
     const top = editor.documentTop
-    return top + editor.lineBlockAt(heading.from).top < viewport.bottom
+    const visible = top + editor.lineBlockAt(heading.from).top < viewport.bottom
       && top + editor.lineBlockAt(heading.to).bottom > viewport.top
+    if (!visible) return 0
+    const endLine = editor.state.doc.lineAt(heading.to).number
+    return heading.name.startsWith('Setext') ? endLine - 1 : endLine
   },
-  write(visible: boolean) {
-    if (!session || visible === session.headingVisible) return
-    session.headingVisible = visible
-    void send({ type: 'headingVisible', id: session.id, visible })
+  write(endLine: number) {
+    if (!session || endLine === session.visibleHeadingEndLine) return
+    session.visibleHeadingEndLine = endLine
+    void send({ type: 'headingVisible', id: session.id, endLine })
   },
 }
 const view = createEditor(host, {

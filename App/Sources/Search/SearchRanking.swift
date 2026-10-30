@@ -625,39 +625,30 @@ extension SearchService {
     private func makeHit(_ doc: Doc, kind: MatchKind, score: Double, signals s: Signals, query q: ParsedQuery, queryVector qv: [Float]?,
                          lineBudget: inout Int, context: RankingContext) -> SearchHit {
         let pin = context.pins.firstIndex(of: doc.id)
-        let snippet: String
-        let highlights: [[Int]]
         let source: Substring?
+        let windowAroundMatch: Bool
         if kind == .semantic, s.bestChunk >= 0 {
             source = semanticLine(doc, chunk: s.bestChunk, query: q, queryVector: qv, lineBudget: &lineBudget) ?? previewLine(doc)
-            snippet = source.map { Self.clip(Self.display($0)) } ?? ""
-            highlights = Self.highlights(in: snippet, query: q)
-        } else if let line = bestLine(doc, occurrences: s.occurrences, query: q) {
-            source = line
-            (snippet, highlights) = Self.window(String(line), query: q)
+            windowAroundMatch = false
         } else {
-            let preview = previewLine(doc)
-            source = kind == .title ? NoteTitle.firstTitle(in: doc.content)?.source : preview
-            snippet = preview.map { Self.clip(Self.display($0)) } ?? ""
-            highlights = Self.highlights(in: snippet, query: q)
+            let match = bestLine(doc, occurrences: s.occurrences, query: q)
+            source = match ?? previewLine(doc)
+            windowAroundMatch = match != nil
+        }
+        let line = DisplayLine(source ?? "")
+        let window = Self.window(line.text, query: q, aroundMatch: windowAroundMatch)
+        let highlights = Self.highlights(in: window.text, query: q)
+        var passage = line.passage(in: doc.content, visible: window.range, leadingEllipsis: window.leadingEllipsis, highlights: highlights)
+        if kind == .title, !windowAroundMatch, highlights.isEmpty, let title = NoteTitle.firstTitle(in: doc.content) {
+            let titleLine = DisplayLine(title.source)
+            let titleHighlights = titleLine.text == doc.title && !s.titleRanges.isEmpty ? s.titleRanges : Self.highlights(in: titleLine.text, query: q)
+            let length = titleHighlights.isEmpty ? titleLine.text.prefix(Self.snippetLength).utf16.count : titleLine.text.utf16.count
+            passage = titleLine.passage(in: doc.content, visible: 0..<length, leadingEllipsis: false, highlights: titleHighlights)
         }
         return SearchHit(
-            id: doc.id, title: doc.title, snippet: snippet, snippetHighlights: highlights, titleHighlights: s.titleRanges,
+            id: doc.id, title: doc.title, snippet: window.text, snippetHighlights: highlights, titleHighlights: s.titleRanges,
             modified: doc.modified.timeIntervalSince1970 * 1000, pinned: pin != nil, pinIndex: pin,
-            matchKind: kind, score: score, passage: source.flatMap { Self.passage($0, in: doc.content, query: q) })
-    }
-
-    private static func passage(_ source: Substring, in content: String, query: ParsedQuery) -> SearchPassage? {
-        let excerpt = source.prefix(600)
-        let text = String(excerpt)
-        let exact = query.substringWorthy ? text.range(of: query.raw, options: .caseInsensitive) : nil
-        let range = exact ?? highlights(in: text, query: query).first.flatMap {
-            Range(NSRange(location: $0[0], length: $0[1] - $0[0]), in: text)
-        }
-        let start = range?.lowerBound ?? text.startIndex
-        let matched = range.map { text[$0] } ?? text.prefix(snippetLength)
-        guard !matched.isEmpty else { return nil }
-        return SearchPassage(offset: source.startIndex.utf16Offset(in: content) + start.utf16Offset(in: text), text: String(matched))
+            matchKind: kind, score: score, passage: passage)
     }
 
     /// Lines (UTF-8 byte ranges) excluding fences/blank lines.
@@ -788,35 +779,104 @@ extension SearchService {
 
     static let snippetLength = 140
 
-    /// Display text for a line: block markers and inline emphasis/code/link syntax removed.
-    static func display(_ line: Substring) -> String {
-        var s = String(Text.displayLine(line)).trimmingCharacters(in: .whitespaces)
-        s = s.replacingOccurrences(of: #"!?\[([^\]]*)\]\([^)]*\)"#, with: "$1", options: .regularExpression)
-        for m in ["**", "__", "~~", "`"] { s = s.replacingOccurrences(of: m, with: "") }
-        return s
+    /// The retained UTF-16 units map even repeated words in the preview back to the exact Markdown occurrence.
+    private struct DisplayLine {
+        let source: Substring
+        let text: String
+        let retained: IndexSet
+
+        private static let link = try! NSRegularExpression(pattern: #"!?\[([^\]]*)\]\([^)]*\)"#)
+        private static let marks = try! NSRegularExpression(pattern: #"\*\*|__|~~|`"#)
+
+        init(_ line: Substring) {
+            let block = Text.displayLine(line)
+            let visible = CharacterSet.whitespaces.inverted
+            let start = block.rangeOfCharacter(from: visible)?.lowerBound ?? block.endIndex
+            let end = block.rangeOfCharacter(from: visible, options: .backwards)?.upperBound ?? block.endIndex
+            source = block[start..<end]
+            let raw = String(source)
+            let length = raw.utf16.count
+            if !raw.contains(where: { "[*_`~".contains($0) }) {
+                text = raw
+                retained = IndexSet(integersIn: 0..<length)
+                return
+            }
+            var kept = IndexSet(integersIn: 0..<length)
+            func joined(_ ranges: IndexSet) -> String {
+                if ranges.count == length { return raw }
+                let ns = raw as NSString
+                return ranges.rangeView.map { ns.substring(with: NSRange($0)) }.joined()
+            }
+            for match in Self.link.matches(in: raw, range: NSRange(location: 0, length: length)) {
+                let label = match.range(at: 1)
+                kept.remove(integersIn: match.range.location..<label.location)
+                kept.remove(integersIn: NSMaxRange(label)..<NSMaxRange(match.range))
+            }
+            let labels = joined(kept)
+            var markup = IndexSet()
+            for match in Self.marks.matches(in: labels, range: NSRange(location: 0, length: kept.count)) {
+                markup.insert(integersIn: match.range.location..<NSMaxRange(match.range))
+            }
+            // Markers are found after link removal, so character pairs that now touch still strip together.
+            var startInLabels = 0
+            for run in kept.rangeView where !markup.isEmpty {
+                for cut in markup.rangeView(of: startInLabels..<(startInLabels + run.count)) {
+                    let shift = run.lowerBound - startInLabels
+                    kept.remove(integersIn: (cut.lowerBound + shift)..<(cut.upperBound + shift))
+                }
+                startInLabels += run.count
+            }
+            retained = kept
+            text = markup.isEmpty ? labels : joined(kept)
+        }
+
+        /// Translate one visible UTF-16 index by skipping the erased runs of Markdown.
+        private func sourceIndex(_ index: Int) -> Int {
+            var remaining = index
+            for run in retained.rangeView {
+                if remaining < run.count { return run.lowerBound + remaining }
+                remaining -= run.count
+            }
+            return source.utf16.count
+        }
+
+        func passage(in content: String, visible: Range<Int>, leadingEllipsis: Bool, highlights: [[Int]]) -> SearchPassage? {
+            guard !visible.isEmpty else { return nil }
+            let origin = visible.lowerBound - (leadingEllipsis ? 1 : 0)
+            let matched = highlights.lazy.map { (origin + $0[0])..<(origin + $0[1]) }
+                .first { visible.lowerBound <= $0.lowerBound && $0.upperBound <= visible.upperBound }
+            let target = matched ?? visible
+            let first = sourceIndex(target.lowerBound), end = sourceIndex(target.upperBound - 1) + 1
+            let raw = String(source) as NSString
+            return SearchPassage(offset: source.startIndex.utf16Offset(in: content) + first,
+                                 text: raw.substring(with: NSRange(location: first, length: end - first)))
+        }
     }
+
+    static func display(_ line: Substring) -> String { DisplayLine(line).text }
 
     private static func clip(_ s: String) -> String {
         guard s.count > snippetLength else { return s }
         return String(s.prefix(snippetLength)).trimmingCharacters(in: .whitespaces) + "…"
     }
 
-    /// One-line window around the first match in `line`, with highlights.
-    private static func window(_ line: String, query q: ParsedQuery) -> (String, [[Int]]) {
-        var text = display(Substring(line))
-        var hl = highlights(in: text, query: q)
-        guard text.count > snippetLength else { return (text, hl) }
-        let firstHL = hl.first?[0] ?? 0
-        let chars = Array(text)
-        // Map UTF-16 offset to character index.
-        var u = 0, ci = 0
-        while ci < chars.count, u + chars[ci].utf16.count <= firstHL { u += chars[ci].utf16.count; ci += 1 }
-        var start = max(0, ci - 40)
-        while start > 0, start < ci, chars[start - 1] != " " { start += 1 }
-        let end = min(chars.count, start + snippetLength)
-        text = (start > 0 ? "…" : "") + String(chars[start..<end]) + (end < chars.count ? "…" : "")
-        hl = highlights(in: text, query: q)
-        return (text, hl)
+    /// The visible range excludes the decorative ellipses, which have no source position.
+    private static func window(_ text: String, query q: ParsedQuery, aroundMatch: Bool)
+        -> (text: String, range: Range<Int>, leadingEllipsis: Bool) {
+        guard text.count > snippetLength else { return (text, 0..<text.utf16.count, false) }
+        if !aroundMatch {
+            let visible = text.prefix(snippetLength).trimmingCharacters(in: .whitespaces)
+            let start = text.range(of: visible, options: .literal)?.lowerBound.utf16Offset(in: text) ?? 0
+            return (visible + "…", start..<(start + visible.utf16.count), false)
+        }
+        let first = highlights(in: text, query: q).first?[0] ?? 0
+        let hit = String.Index(utf16Offset: first, in: text)
+        var start = text.index(hit, offsetBy: -40, limitedBy: text.startIndex) ?? text.startIndex
+        while start > text.startIndex, start < hit, text[text.index(before: start)] != " " { text.formIndex(after: &start) }
+        let end = text.index(start, offsetBy: snippetLength, limitedBy: text.endIndex) ?? text.endIndex
+        let leading = start != text.startIndex
+        let shown = (leading ? "…" : "") + text[start..<end] + (end < text.endIndex ? "…" : "")
+        return (shown, start.utf16Offset(in: text)..<end.utf16Offset(in: text), leading)
     }
 
     /// UTF-16 ranges of query tokens (and their stems/corrections) in `s`. Short tokens only at word starts.

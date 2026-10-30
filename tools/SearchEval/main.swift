@@ -459,6 +459,23 @@ do {
         let got = await svc.preview(doc)
         if got != want { bad.append("snippet \(content.debugDescription): \(got.debugDescription)") }
     }
+    // The result shows the visible word, never the identical word in a stripped link destination.
+    // Include UTF-16 pairs, CRLF, clipping, and a title-only fuzzy match beyond a short preview.
+    let passageCases = [
+        ("pickup", "# Link check 🪶\r\n\r\n" + String(repeating: "scene ", count: 20)
+            + "[site](https://example.com/pickup) then **pickup** " + String(repeating: "scene ", count: 20), "pickup"),
+        ("calibartion", "# " + String(repeating: "scene ", count: 160) + "calibration\n\nbrief", "calibration"),
+    ]
+    for (i, item) in passageCases.enumerated() {
+        let (query, content, expected) = item
+        let id = "passage-\(i)"
+        await svc.upsert(IndexedNote(id: id, content: content, modified: Date()))
+        let hit = await svc.search(query, context: ctx).first { $0.id == id }
+        let location = (content as NSString).range(of: expected, options: .backwards).location
+        if hit?.passage?.offset != location || hit?.passage?.text != expected {
+            bad.append("passage for \(query): \(String(describing: hit?.passage)) (expected \(expected) at \(location))")
+        }
+    }
     let prose = ["![](assets/x.png)\n", "![][im]\n\n[im]: assets/x.png\n"].map { Text.proseLetters($0, cap: 32) }
     if prose != [0, 0] { bad.append("image-only prose letters (inline, reference): \(prose)") }
     print("titles/snippets (plain text, markup lines skipped): \(bad.isEmpty ? "ok" : "FAIL")")

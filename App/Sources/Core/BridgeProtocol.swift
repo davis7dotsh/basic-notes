@@ -80,7 +80,7 @@ enum ToSwift: Sendable {
     case saveImage(base64: String, mime: String, filename: String?)
     case search(query: String)
     case open(id: NoteID, passage: SearchPassage?)
-    case headingVisible(id: NoteID, visible: Bool)
+    case headingVisible(id: NoteID, endLine: Int)
     case newNote
     case deleteNote(id: NoteID)
     case togglePin(id: NoteID)
@@ -107,7 +107,7 @@ enum ToSwift: Sendable {
 
 extension ToSwift: Decodable {
     private enum K: String, CodingKey {
-        case type, id, passage, visible, content, viewState, base64, mime, filename, query, index, markdown, html, url, level, message, text, images, open, token, inserted, replaced, step
+        case type, id, passage, endLine, content, viewState, base64, mime, filename, query, index, markdown, html, url, level, message, text, images, open, token, inserted, replaced, step
     }
 
     init(from decoder: Decoder) throws {
@@ -124,7 +124,7 @@ extension ToSwift: Decodable {
                 filename: try c.decodeIfPresent(String.self, forKey: .filename))
         case "search": self = .search(query: try c.decode(String.self, forKey: .query))
         case "open": self = .open(id: try c.decode(String.self, forKey: .id), passage: try c.decodeIfPresent(SearchPassage.self, forKey: .passage))
-        case "headingVisible": self = .headingVisible(id: try c.decode(String.self, forKey: .id), visible: try c.decode(Bool.self, forKey: .visible))
+        case "headingVisible": self = .headingVisible(id: try c.decode(String.self, forKey: .id), endLine: try c.decode(Int.self, forKey: .endLine))
         case "newNote": self = .newNote
         case "deleteNote": self = .deleteNote(id: try c.decode(String.self, forKey: .id))
         case "togglePin": self = .togglePin(id: try c.decode(String.self, forKey: .id))

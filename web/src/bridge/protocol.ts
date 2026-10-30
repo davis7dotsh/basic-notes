@@ -83,7 +83,8 @@ export type ToSwift =
   /** Reply: SearchHit[] (empty query => recents with pins on top). */
   | { type: 'search'; query: string }
   | { type: 'open'; id: NoteId; passage?: SearchPassage }
-  | { type: 'headingVisible'; id: NoteId; visible: boolean }
+  /** Last line of the leading heading while visible, zero when offscreen or absent. */
+  | { type: 'headingVisible'; id: NoteId; endLine: number }
   | { type: 'newNote' }
   /** Moves the note's file to the macOS Trash. Swift then loads another note. Reply { ok: true }; REJECTS if trashing failed (show nothing optimistic before the reply). */
   | { type: 'deleteNote'; id: NoteId }
