@@ -1,6 +1,6 @@
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, toggleBlockComment, toggleComment } from '@codemirror/commands'
-import { indentUnit } from '@codemirror/language'
+import { indentUnit, syntaxTree } from '@codemirror/language'
 import { Annotation, EditorSelection, EditorState, Extension, Prec, Transaction } from '@codemirror/state'
 import { drawSelection, dropCursor, EditorView, keymap, placeholder, ViewPlugin, ViewUpdate } from '@codemirror/view'
 import { send } from '../bridge/client'
@@ -10,6 +10,7 @@ import { historySlot, redoSelection } from './historyEdit'
 import { images } from './images'
 import { highlighting, markdownSupport } from './language'
 import { livePreview } from './livePreview'
+import { passageHighlight } from './searchPassage'
 import { normalCaret, surrogateGuard } from './unicode'
 import { vimCompartment, vimExtension } from './vimMode'
 
@@ -18,9 +19,10 @@ export type EditorHooks = {
   docChanged(external: boolean): void
   /** Selection or scroll moved (for viewState persistence). */
   viewChanged(): void
+  layoutChanged(view: EditorView): void
 }
 
-let hooks: EditorHooks = { docChanged() {}, viewChanged() {} }
+let hooks: EditorHooks = { docChanged() {}, viewChanged() {}, layoutChanged() {} }
 let vimOn = false
 
 /** Marks transactions that apply on-disk changes so they don't count as local edits. */
@@ -94,6 +96,7 @@ function extensions(): Extension[] {
     markdownSupport(),
     highlighting,
     livePreview,
+    passageHighlight,
     images,
     wrapOnType,
     absorbListMarker,
@@ -111,6 +114,7 @@ function extensions(): Extension[] {
     EditorView.updateListener.of((u) => {
       if (u.docChanged) hooks.docChanged(u.transactions.some((tr) => tr.annotation(External) === true))
       if (u.selectionSet) hooks.viewChanged()
+      if (u.docChanged || u.geometryChanged || u.viewportChanged || syntaxTree(u.state) !== syntaxTree(u.startState)) hooks.layoutChanged(u.view)
     }),
     EditorView.domEventHandlers({
       scroll() {

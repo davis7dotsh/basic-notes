@@ -20,6 +20,7 @@ Building needs Xcode, `xcodegen`, `bun`, and network for the first `scripts/fetc
 - Raycast: extension in [raycast/](raycast/README.md) (Toggle / New / Search / Open Note commands, bind Hyper+`\` to Toggle)
 - In the panel: `⌘K` actions · `⌘P` search · `⌘N` new · `⌘[` / `⌘]` back/forward · `⌘⇧P` pin · `⌘1`–`⌘0` pins · `⌘⇧C` copy note · `⌘⇧⌫` delete to Trash · `⌘⇧K` link · `⌘=` / `⌘-` zoom · `Esc` / `⌘W` hide · `⌘,` settings
 - Vim mode is opt-in in Settings (notes open in Normal; Esc in Normal hides)
+- Opening a search match jumps to the passage and briefly highlights it. Opening a recent note restores your place.
 - Panel opens 300×700; drag the header to move, any edge to resize (position, size and zoom are remembered)
 
 ## Notes

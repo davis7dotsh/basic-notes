@@ -218,6 +218,14 @@ final class DragStrip: NSView {
         pin.isHidden = !pinned
     }
 
+    func setHeadingVisible(_ visible: Bool) {
+        let alpha: CGFloat = visible ? 0 : 1
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.15
+            label.animator().alphaValue = alpha
+        }
+    }
+
     var isPinned: Bool { !pin.isHidden }
 
     @objc private func closeClicked() { onClose?() }

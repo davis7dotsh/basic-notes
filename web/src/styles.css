@@ -167,6 +167,10 @@ body {
 #app .cm-content ::selection {
   background: var(--selection);
 }
+#app .cm-search-passage {
+  background: var(--search-match);
+  border-radius: 2px;
+}
 #app .cm-placeholder {
   color: var(--faint);
 }

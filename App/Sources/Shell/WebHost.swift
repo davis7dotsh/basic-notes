@@ -231,7 +231,7 @@ final class WebHost: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDele
         case .save(let id, let content): "save \(id) (\(content.utf8.count)b)"
         case .saveImage(_, let mime, _): "saveImage \(mime)"
         case .search(let q): "search \"\(q)\""
-        case .open(let id): "open \(id)"
+        case .open(let id, _): "open \(id)"
         case .deleteNote(let id): "deleteNote \(id)"
         case .togglePin(let id): "togglePin \(id)"
         case .openPin(let i): "openPin \(i)"

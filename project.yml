@@ -37,7 +37,7 @@ targets:
         CFBundleDisplayName: Basic Notes
         CFBundleName: BasicNotes
         CFBundleShortVersionString: "0.1.1"
-        CFBundleVersion: "2"
+        CFBundleVersion: "3"
         LSUIElement: true
         LSMinimumSystemVersion: "15.0"
         NSHumanReadableCopyright: ""

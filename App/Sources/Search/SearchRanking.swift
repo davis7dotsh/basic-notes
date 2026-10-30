@@ -555,7 +555,7 @@ extension SearchService {
         var budget = Tune.lineRescoreBudget
         for (id, s) in picks {
             guard let doc = docs[id], let line = s.line else { continue }
-            let text = Self.display(Substring(lineText(doc, line, maxBytes: 400)))
+            let text = Self.display(lineText(doc, line, maxBytes: 400))
             guard Text.words(text).count >= 2, let v = lineVectors([String(text.prefix(120))], budget: &budget).first ?? nil else { continue }
             out[id] = Self.dot(qv, v)
         }
@@ -625,20 +625,39 @@ extension SearchService {
     private func makeHit(_ doc: Doc, kind: MatchKind, score: Double, signals s: Signals, query q: ParsedQuery, queryVector qv: [Float]?,
                          lineBudget: inout Int, context: RankingContext) -> SearchHit {
         let pin = context.pins.firstIndex(of: doc.id)
-        var snippet = preview(doc)
-        var highlights: [[Int]] = []
+        let snippet: String
+        let highlights: [[Int]]
+        let source: Substring?
         if kind == .semantic, s.bestChunk >= 0 {
-            snippet = semanticSnippet(doc, chunk: s.bestChunk, query: q, queryVector: qv, lineBudget: &lineBudget)
+            source = semanticLine(doc, chunk: s.bestChunk, query: q, queryVector: qv, lineBudget: &lineBudget) ?? previewLine(doc)
+            snippet = source.map { Self.clip(Self.display($0)) } ?? ""
             highlights = Self.highlights(in: snippet, query: q)
         } else if let line = bestLine(doc, occurrences: s.occurrences, query: q) {
-            (snippet, highlights) = Self.window(line, query: q)
+            source = line
+            (snippet, highlights) = Self.window(String(line), query: q)
         } else {
+            let preview = previewLine(doc)
+            source = kind == .title ? NoteTitle.firstTitle(in: doc.content)?.source : preview
+            snippet = preview.map { Self.clip(Self.display($0)) } ?? ""
             highlights = Self.highlights(in: snippet, query: q)
         }
         return SearchHit(
             id: doc.id, title: doc.title, snippet: snippet, snippetHighlights: highlights, titleHighlights: s.titleRanges,
             modified: doc.modified.timeIntervalSince1970 * 1000, pinned: pin != nil, pinIndex: pin,
-            matchKind: kind, score: score)
+            matchKind: kind, score: score, passage: source.flatMap { Self.passage($0, in: doc.content, query: q) })
+    }
+
+    private static func passage(_ source: Substring, in content: String, query: ParsedQuery) -> SearchPassage? {
+        let excerpt = source.prefix(600)
+        let text = String(excerpt)
+        let exact = query.substringWorthy ? text.range(of: query.raw, options: .caseInsensitive) : nil
+        let range = exact ?? highlights(in: text, query: query).first.flatMap {
+            Range(NSRange(location: $0[0], length: $0[1] - $0[0]), in: text)
+        }
+        let start = range?.lowerBound ?? text.startIndex
+        let matched = range.map { text[$0] } ?? text.prefix(snippetLength)
+        guard !matched.isEmpty else { return nil }
+        return SearchPassage(offset: source.startIndex.utf16Offset(in: content) + start.utf16Offset(in: text), text: String(matched))
     }
 
     /// Lines (UTF-8 byte ranges) excluding fences/blank lines.
@@ -654,13 +673,13 @@ extension SearchService {
     }
 
     /// Text of a byte range, clamped to `maxBytes` and snapped to UTF-8 character boundaries.
-    private func lineText(_ doc: Doc, _ r: (start: Int, end: Int), maxBytes: Int = 600) -> String {
-        doc.content.utf8.withContiguousStorageIfAvailable { buf -> String in
-            var a = max(0, r.start), b = min(buf.count, r.end, a + maxBytes)
-            while a < b, buf[a] & 0xC0 == 0x80 { a += 1 }
-            while b > a, b < buf.count, buf[b] & 0xC0 == 0x80 { b -= 1 }
-            return String(decoding: UnsafeBufferPointer(rebasing: buf[a..<b]), as: UTF8.self)
-        } ?? ""
+    private func lineText(_ doc: Doc, _ r: (start: Int, end: Int), maxBytes: Int = 600) -> Substring {
+        let utf8 = doc.content.utf8
+        var a = utf8.index(utf8.startIndex, offsetBy: r.start)
+        var b = utf8.index(a, offsetBy: min(r.end - r.start, maxBytes))
+        while a < b, utf8[a] & 0xC0 == 0x80 { utf8.formIndex(after: &a) }
+        while b > a, b < utf8.endIndex, utf8[b] & 0xC0 == 0x80 { utf8.formIndex(before: &b) }
+        return doc.content[a..<b]
     }
 
     /// The title line again (compared as plain text, the way the title was made), markup, or nothing readable.
@@ -672,15 +691,19 @@ extension SearchService {
         return plain.isEmpty || plain == doc.title || NoteTitle.text(ofLine: text) == doc.title
     }
 
-    func preview(_ doc: Doc) -> String {
+    private func previewLine(_ doc: Doc) -> Substring? {
         for r in Self.lines(doc) {
-            let t = lineText(doc, r)
-            if !isTitleOrJunk(doc, t) { return Self.clip(Self.display(Substring(t))) }
+            let line = lineText(doc, r)
+            if !isTitleOrJunk(doc, String(line)) { return line }
         }
-        return ""
+        return nil
     }
 
-    private func bestLine(_ doc: Doc, occurrences: [[Int]], query q: ParsedQuery) -> String? {
+    func preview(_ doc: Doc) -> String {
+        previewLine(doc).map { Self.clip(Self.display($0)) } ?? ""
+    }
+
+    private func bestLine(_ doc: Doc, occurrences: [[Int]], query q: ParsedQuery) -> Substring? {
         let f = doc.folded
         // The literal query (when meaningful) beats any mix of its words.
         let phrase = q.substringWorthy ? f.occurrences(of: q.folded, max: 8) : []
@@ -700,31 +723,34 @@ extension SearchService {
             }
         }
         let ranked = scores.sorted { $0.value.score != $1.value.score ? $0.value.score > $1.value.score : $0.key < $1.key }
-        let texts = ranked.map { lineText(doc, ($0.key, $0.value.end)) }
-        return texts.first { !isTitleOrJunk(doc, $0) } ?? nil
+        for (start, candidate) in ranked {
+            let text = lineText(doc, (start, candidate.end))
+            if !isTitleOrJunk(doc, String(text)) { return text }
+        }
+        return nil
     }
 
     /// The line of the best-matching chunk closest in meaning to the query (line embeddings, cached by text; a
     /// per-search budget bounds model work), falling back to word overlap + substance when out of budget.
-    private func semanticSnippet(_ doc: Doc, chunk: Int, query q: ParsedQuery, queryVector qv: [Float]?, lineBudget: inout Int) -> String {
-        guard chunk * 2 + 1 < doc.chunks.count else { return preview(doc) }
+    private func semanticLine(_ doc: Doc, chunk: Int, query q: ParsedQuery, queryVector qv: [Float]?, lineBudget: inout Int) -> Substring? {
+        guard chunk * 2 + 1 < doc.chunks.count else { return nil }
         var a = Int(doc.chunks[chunk * 2]), b = Int(doc.chunks[chunk * 2 + 1])
         if a == 0 && b == 0, doc.chunks.count >= 4 { (a, b) = (Int(doc.chunks[0]), Int(doc.chunks[1])) }  // title chunk: first body chunk
         let u = doc.content.utf16
-        guard a >= 0, b <= u.count, a < b else { return preview(doc) }
+        guard a >= 0, b <= u.count, a < b else { return nil }
         let body = doc.content[String.Index(utf16Offset: a, in: doc.content)..<String.Index(utf16Offset: b, in: doc.content)]
-        let all = body.split(whereSeparator: \.isNewline).map(String.init)
-            .filter { !isTitleOrJunk(doc, $0) && $0.contains(where: { $0.isLetter || $0.isNumber }) }
+        let all = body.split(whereSeparator: \.isNewline)
+            .filter { !isTitleOrJunk(doc, String($0)) && $0.contains(where: { $0.isLetter || $0.isNumber }) }
         // Short fragments and headings embed close to everything; use them only when there's nothing more substantive.
-        let substantive = all.filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") && Text.words($0).count >= 3 }
+        let substantive = all.filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") && Text.words(String($0)).count >= 3 }
         let lines = (substantive.isEmpty ? all : substantive).prefix(8)
-        guard !lines.isEmpty else { return preview(doc) }
+        guard !lines.isEmpty else { return nil }
         let stems = Set(q.words.filter { !Text.stopwords.contains($0) }.map { Text.stem($0) })
-        var best: String?
+        var best: Substring?
         var bestScore = -Double.infinity
-        let vectors = qv == nil ? [] : lineVectors(lines.map { Self.display(Substring($0)) }, budget: &lineBudget)
+        let vectors = qv == nil ? [] : lineVectors(lines.map { Self.display($0) }, budget: &lineBudget)
         for (i, s) in lines.enumerated() {
-            let words = Text.words(s)
+            let words = Text.words(String(s))
             var score: Double
             if let qv, i < vectors.count, let v = vectors[i] {
                 score = Double(Self.dot(qv, v))
@@ -736,8 +762,7 @@ extension SearchService {
             }
             if score > bestScore { best = s; bestScore = score }
         }
-        guard let best else { return preview(doc) }
-        return Self.clip(Self.display(Substring(best)))
+        return best
     }
 
     private static func dot(_ a: [Float], _ b: [Float]) -> Float {

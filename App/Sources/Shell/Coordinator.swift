@@ -454,8 +454,11 @@ final class Coordinator {
         case .search(let query):
             let hits = await search.search(query, context: rankingContext())
             return .success(Self.jsonObject(hits))
-        case .open(let id):
-            navigate(.note(id))
+        case .headingVisible(let id, let visible):
+            if id == currentID { panel.strip.setHeadingVisible(visible) }
+            return .success(nil)
+        case .open(let id, let passage):
+            navigate(.note(id, passage: passage))
             return .success(nil)
         case .newNote:
             navigate(.new)
@@ -672,7 +675,7 @@ final class Coordinator {
 
     // MARK: Navigation
 
-    enum Destination: Equatable { case note(NoteID), new, back, forward }
+    enum Destination: Equatable { case note(NoteID, passage: SearchPassage? = nil), new, back, forward }
 
     func navigate(_ destination: Destination, then: (() -> Void)? = nil) {
         enqueue { [self] in
@@ -689,8 +692,12 @@ final class Coordinator {
                 state.visit(from: previous, to: id)
                 cleanupIfEmpty(previous)
                 present(id, isNew: true, content: "")
-            case .note(let id):
-                guard id != previous else { web.send(.focus); break }
+            case .note(let id, let passage):
+                guard id != previous else {
+                    if let passage { present(id, isNew: currentIsNew, content: currentContent, passage: passage) }
+                    else { web.send(.focus) }
+                    break
+                }
                 let read = editorText(id)
                 guard case .success(let content) = read else {
                     Log.warn("open: can't read \(id): \(read)")
@@ -700,7 +707,7 @@ final class Coordinator {
                 state.visit(from: previous, to: id)
                 cleanupIfEmpty(previous)
                 state.recordOpen(id)
-                present(id, isNew: false, content: content)
+                present(id, isNew: false, content: content, passage: passage)
             case .back, .forward:
                 let step = { (current: NoteID?) in destination == .back ? self.state.goBack(current: current) : self.state.goForward(current: current) }
                 var target = step(previous)
@@ -722,7 +729,7 @@ final class Coordinator {
         }
     }
 
-    private func present(_ id: NoteID, isNew: Bool, content: String) {
+    private func present(_ id: NoteID, isNew: Bool, content: String, passage: SearchPassage? = nil) {
         // Leaving a note whose file went with the missing folder (its buffer was clean — else the flush would have kept it
         // on screen): keep its text for when the folder is back.
         if folderMissing, let previous = currentID, previous != id, !currentIsNew, !store.exists(previous) {
@@ -739,7 +746,7 @@ final class Coordinator {
         web.send(.loadNote(NotePayload(
             id: id, content: content, pinned: pin != nil, pinIndex: pin, isNew: isNew,
             viewState: isNew ? nil : state.viewState(for: id),
-            canGoBack: state.canGoBack, canGoForward: state.canGoForward, folder: folderKey)))
+            canGoBack: state.canGoBack, canGoForward: state.canGoForward, folder: folderKey, passage: passage)))
         web.send(.navState(canGoBack: state.canGoBack, canGoForward: state.canGoForward))
         panel.setStrip(title: content.isBlank ? "" : NoteTitle.from(content), pinned: pin != nil)
         // Showing text that couldn't go into the (restored) folder yet (see `editorText`): it's the editor's now.

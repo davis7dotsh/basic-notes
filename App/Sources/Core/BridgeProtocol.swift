@@ -26,6 +26,7 @@ struct NotePayload: Codable, Sendable {
     var canGoForward: Bool
     /// Opaque key of the note's folder: JS namespaces relative image URLs/caches by it (see protocol.ts).
     var folder: String?
+    var passage: SearchPassage?
 }
 
 struct EditorSettings: Codable, Equatable, Sendable {
@@ -34,6 +35,12 @@ struct EditorSettings: Codable, Equatable, Sendable {
 
 enum MatchKind: String, Codable, Sendable {
     case recent, title, text, semantic
+}
+
+/// Original Markdown at a UTF-16 offset in the indexed file, before editor newline normalization.
+struct SearchPassage: Codable, Equatable, Sendable {
+    var offset: Int
+    var text: String
 }
 
 struct SearchHit: Codable, Sendable {
@@ -50,6 +57,7 @@ struct SearchHit: Codable, Sendable {
     var pinIndex: Int?
     var matchKind: MatchKind
     var score: Double
+    var passage: SearchPassage?
 }
 
 /// A real Markdown image node from the Lezer parse. from/to are UTF-16 offsets of the destination text in `markdown`.
@@ -71,7 +79,8 @@ enum ToSwift: Sendable {
     case viewState(id: NoteID, viewState: ViewState)
     case saveImage(base64: String, mime: String, filename: String?)
     case search(query: String)
-    case open(id: NoteID)
+    case open(id: NoteID, passage: SearchPassage?)
+    case headingVisible(id: NoteID, visible: Bool)
     case newNote
     case deleteNote(id: NoteID)
     case togglePin(id: NoteID)
@@ -98,7 +107,7 @@ enum ToSwift: Sendable {
 
 extension ToSwift: Decodable {
     private enum K: String, CodingKey {
-        case type, id, content, viewState, base64, mime, filename, query, index, markdown, html, url, level, message, text, images, open, token, inserted, replaced, step
+        case type, id, passage, visible, content, viewState, base64, mime, filename, query, index, markdown, html, url, level, message, text, images, open, token, inserted, replaced, step
     }
 
     init(from decoder: Decoder) throws {
@@ -114,7 +123,8 @@ extension ToSwift: Decodable {
                 mime: try c.decode(String.self, forKey: .mime),
                 filename: try c.decodeIfPresent(String.self, forKey: .filename))
         case "search": self = .search(query: try c.decode(String.self, forKey: .query))
-        case "open": self = .open(id: try c.decode(String.self, forKey: .id))
+        case "open": self = .open(id: try c.decode(String.self, forKey: .id), passage: try c.decodeIfPresent(SearchPassage.self, forKey: .passage))
+        case "headingVisible": self = .headingVisible(id: try c.decode(String.self, forKey: .id), visible: try c.decode(Bool.self, forKey: .visible))
         case "newNote": self = .newNote
         case "deleteNote": self = .deleteNote(id: try c.decode(String.self, forKey: .id))
         case "togglePin": self = .togglePin(id: try c.decode(String.self, forKey: .id))
@@ -146,7 +156,7 @@ extension ToSwift {
     /// The note id a message addresses, if any (validated at the bridge boundary).
     var noteID: NoteID? {
         switch self {
-        case .save(let id, _), .viewState(let id, _), .open(let id), .deleteNote(let id), .togglePin(let id), .copyNote(let id, _, _, _): id
+        case .save(let id, _), .viewState(let id, _), .open(let id, _), .headingVisible(let id, _), .deleteNote(let id), .togglePin(let id), .copyNote(let id, _, _, _): id
         default: nil
         }
     }
