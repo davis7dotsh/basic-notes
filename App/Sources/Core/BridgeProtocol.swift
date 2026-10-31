@@ -88,6 +88,7 @@ enum ToSwift: Sendable {
     case back
     case forward
     case copyNote(id: NoteID, markdown: String, html: String, images: [ImageRef])
+    case copyImage(src: String, folder: String)
     case hide
     /// The ⌘P search overlay opened/closed: native ⌘V then pastes into its input instead of the note.
     case searchOpen(Bool)
@@ -107,7 +108,7 @@ enum ToSwift: Sendable {
 
 extension ToSwift: Decodable {
     private enum K: String, CodingKey {
-        case type, id, passage, endLine, content, viewState, base64, mime, filename, query, index, markdown, html, url, level, message, text, images, open, token, inserted, replaced, step
+        case type, id, passage, endLine, content, viewState, base64, mime, filename, query, index, markdown, html, url, level, message, text, images, open, token, inserted, replaced, step, src, folder
     }
 
     init(from decoder: Decoder) throws {
@@ -137,6 +138,7 @@ extension ToSwift: Decodable {
                 markdown: try c.decode(String.self, forKey: .markdown),
                 html: try c.decode(String.self, forKey: .html),
                 images: try c.decodeIfPresent([ImageRef].self, forKey: .images) ?? [])
+        case "copyImage": self = .copyImage(src: try c.decode(String.self, forKey: .src), folder: try c.decode(String.self, forKey: .folder))
         case "hide": self = .hide
         case "searchOpen": self = .searchOpen(try c.decode(Bool.self, forKey: .open))
         case "pasteResult": self = .pasteResult(token: try c.decode(String.self, forKey: .token), inserted: try c.decode(Bool.self, forKey: .inserted))

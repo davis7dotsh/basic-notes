@@ -162,6 +162,41 @@ enum ClipboardExport {
         pasteboard.writeObjects([item] + images)
     }
 
+    /// A single image from the editor's context menu. Only image bytes go on the clipboard, so pasting into the note
+    /// or another app inserts the picture. Resolve local files through the same folder boundary as the renderer.
+    static func copyImage(_ src: String, folder: URL, to pasteboard: NSPasteboard = .general) async -> Result<Void, BridgeError> {
+        let data: Data
+        if let embedded = dataURIImage(src) {
+            data = embedded.data
+        } else if let path = localPath(src), let file = NoteStore.resolve(relativePath: path, in: folder),
+                  let stat = NoteRegistry.fileStat(file.path), stat.isFile, stat.size <= Int64(maxImageBytes),
+                  let bytes = try? Data(contentsOf: file) {
+            data = bytes
+        } else if let url = URL(string: src), let scheme = url.scheme?.lowercased(), ["https", "http"].contains(scheme) {
+            do {
+                let (bytes, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 15))
+                guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+                    return .failure(BridgeError("couldn’t load image"))
+                }
+                data = bytes
+            } catch {
+                return .failure(BridgeError("couldn’t load image: \(error.localizedDescription)"))
+            }
+        } else {
+            return .failure(BridgeError("image is unavailable"))
+        }
+        guard !data.isEmpty, data.count <= maxImageBytes, let image = NSImage(data: data),
+              let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:]) else {
+            return .failure(BridgeError("couldn’t decode image"))
+        }
+        let item = NSPasteboardItem()
+        item.setData(png, forType: .png)
+        pasteboard.clearContents()
+        guard pasteboard.writeObjects([item]) else { return .failure(BridgeError("couldn’t write image to clipboard")) }
+        return .success(())
+    }
+
     /// Our own copy on the pasteboard (original Markdown + where it came from), else nil.
     static func ownCopy(_ pasteboard: NSPasteboard) -> OwnCopy? {
         guard pasteboard.availableType(from: [marker]) != nil else { return nil }

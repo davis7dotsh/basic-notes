@@ -1,9 +1,10 @@
-import { syntaxTree } from '@codemirror/language'
+import { ensureSyntaxTree, syntaxTree } from '@codemirror/language'
 import { EditorState, Line, Range, StateEffect, StateField, Transaction } from '@codemirror/state'
 import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view'
 import type { SyntaxNode, Tree } from '@lezer/common'
 import { isNative } from '../bridge/client'
 import { collectDefs, decodeDestination, destination, type LinkDef, refLabel } from './imageNodes'
+import { imageContextMenu } from './imageMenu'
 import { enclosingItem, itemContentIndent } from './listIndent'
 
 // Images render as block widgets under their line. They live in a StateField (block decorations can't come
@@ -127,6 +128,8 @@ class ImageWidget extends WidgetType {
   constructor(
     readonly src: string,
     readonly alt: string,
+    /** Image node start relative to the widget's line end; stays valid when edits move the line. */
+    readonly offset: number,
     /** Inside a list item: the item's text column (rem), so the image sits under the item's text. */
     readonly indent = 0,
     /** Inside a blockquote: drawn in the quote's gutter, its border running through the image. */
@@ -140,6 +143,7 @@ class ImageWidget extends WidgetType {
     return (
       other.src === this.src &&
       other.alt === this.alt &&
+      other.offset === this.offset &&
       other.indent === this.indent &&
       other.quoted === this.quoted &&
       other.folder === this.folder &&
@@ -186,10 +190,22 @@ class ImageWidget extends WidgetType {
     // Clicking an image puts the cursor on its markdown line (which reveals the raw syntax).
     wrap.addEventListener('mousedown', (e) => {
       e.preventDefault()
+      if (e.button !== 0 || e.ctrlKey) return
       const pos = view.posAtDOM(wrap)
       const line = view.state.doc.lineAt(Math.min(pos, view.state.doc.length))
       view.dispatch({ selection: { anchor: line.to } })
       view.focus()
+    })
+    wrap.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const pos = view.posAtDOM(wrap)
+      const from = pos + this.offset
+      // Confirm the real node, including for provisional widgets beyond the background parse.
+      let node = ensureSyntaxTree(view.state, pos, 100)?.resolveInner(from + 1, -1) ?? null
+      while (node && node.name !== 'Image') node = node.parent
+      if (!node || node.from !== from) return
+      view.plugin(imageContextMenu)?.open(e, { from, to: node.to, src: this.src, folder: this.folder, img })
     })
     return wrap
   }
@@ -256,7 +272,7 @@ function scan(state: EditorState, tree: Tree, defs: Defs, from: number, to: numb
       const item = enclosingItem(node)
       const indent = item ? itemContentIndent(item) : 0
       const quoted = inQuote(node)
-      out.push(Decoration.widget({ widget: new ImageWidget(src, alt, indent, quoted), block: true, side: 1 }).range(line.to))
+      out.push(Decoration.widget({ widget: new ImageWidget(src, alt, ref.from - line.to, indent, quoted), block: true, side: 1 }).range(line.to))
       const entry = byLine.get(line.number) ?? { line, spans: [] }
       entry.spans.push([ref.from, ref.to])
       byLine.set(line.number, entry)
@@ -283,7 +299,7 @@ function guess(state: EditorState, from: number, out: Range<Decoration>[]) {
     const line = doc.line(n)
     if (line.text.indexOf('![') < 0) continue
     for (const m of line.text.matchAll(GUESS_RE)) {
-      out.push(Decoration.widget({ widget: new ImageWidget(decodeDestination(m[2]), m[1]), block: true, side: 1 }).range(line.to))
+      out.push(Decoration.widget({ widget: new ImageWidget(decodeDestination(m[2]), m[1], line.from + m.index - line.to), block: true, side: 1 }).range(line.to))
     }
   }
 }

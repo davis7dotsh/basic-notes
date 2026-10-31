@@ -26,7 +26,7 @@ Building needs Xcode, `xcodegen`, `bun`, and network for the first `scripts/fetc
 ## Notes
 
 - `⌘⇧C` copies the whole note: Markdown with images inlined as data URIs and HTML with embedded images (Docs/Notion take these). A note with images also gets one PNG of the whole rendered note (640pt wide, 2×, scaled down past 10000px tall), so chat apps that paste only an image get all of it; if that render fails, each image goes on as its own item instead. No file URLs (WebKit/Safari would drop the text).
-- Pasted/dropped images go to `<notes folder>/assets/` and are linked relatively.
+- Pasted/dropped images go to `<notes folder>/assets/` and are linked relatively. Right-click an image to copy it or remove it from the note (⌘Z restores it).
 - Edited in two places at once? Both versions are kept: the other one becomes `<note-id>-conflict-<HHmmss>.md` next to the original.
 - If a save fails at quit (notes folder gone/unwritable), the text is kept in a recovery folder and comes back as `<note-id>-recovered-….md` on next launch.
 - App state (pins, history, search index) lives in `~/Library/Application Support/BasicNotes/`; delete it any time — it rebuilds from the `.md` files.

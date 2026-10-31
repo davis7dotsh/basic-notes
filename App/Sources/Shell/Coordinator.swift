@@ -501,6 +501,15 @@ final class Coordinator {
             Log.info("copied note: md \(output.markdown.utf8.count)b, html \(output.html.utf8.count)b, \(output.inlinedImages) image(s) inlined, "
                 + (output.snapshot.map { "snapshot \($0.count)b" } ?? "\(output.attachments.count) image(s) attached"))
             return .success(["ok": true])
+        case .copyImage(let src, let folder):
+            guard folder == folderKey else { return .failure(BridgeError("the notes folder changed")) }
+            switch await ClipboardExport.copyImage(src, folder: store.folder) {
+            case .success:
+                lastOwnCopy = nil
+                syncSystemClipboard()
+                return .success(["ok": true])
+            case .failure(let error): return .failure(error)
+            }
         case .hide:
             hide()
             return .success(nil)

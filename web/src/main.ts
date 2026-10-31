@@ -9,6 +9,7 @@ import { insertLink, toggleEmphasis, toggleHeading, toggleInline, toggleList } f
 import { cancelPaste, completePaste, guardWindowDrops, insertBlock, insertInline, newDropSession, reservePaste } from './editor/dnd'
 import { createEditor, createState, External, isVimOn, setVim } from './editor/editor'
 import { collectImages } from './editor/imageNodes'
+import { imageContextMenu } from './editor/imageMenu'
 import { bumpAssets, images, refreshImages, setImageFolder } from './editor/images'
 import { clusterStart, normalCaret } from './editor/unicode'
 import { locatePassage, revealPassage } from './editor/searchPassage'
@@ -563,6 +564,7 @@ const menu = createActions(app, {
 // ---------- keys ----------
 function onKeyDown(e: KeyboardEvent) {
   if (e.isComposing) return
+  if (view.plugin(imageContextMenu)?.keydown(e)) return
   if (e.key === 'Escape') {
     if (search.isOpen()) {
       search.close()

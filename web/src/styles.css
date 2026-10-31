@@ -439,6 +439,41 @@ body {
   background: var(--code-bg);
 }
 
+.image-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 164px;
+  max-width: calc(100vw - 12px);
+  padding: 5px;
+  border: 1px solid var(--toast-border);
+  border-radius: 10px;
+  background: var(--toast-bg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}
+.image-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--fg);
+  font: 13px/20px var(--font);
+  text-align: left;
+  cursor: default;
+}
+.image-menu button:hover:not(:disabled),
+.image-menu button:focus-visible {
+  background: var(--row-selected);
+  outline: none;
+}
+.image-menu .image-menu-delete {
+  color: var(--danger);
+}
+.image-menu button:disabled {
+  opacity: 0.45;
+}
+
 /* ---------------- vim ---------------- */
 
 /* Normal-mode block: a solid accent block with the character readable on top (min width so it's still a

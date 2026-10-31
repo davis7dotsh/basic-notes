@@ -96,6 +96,8 @@ export type ToSwift =
   | { type: 'forward' }
   /** ⌘⇧C. `html` is rendered from markdown with image src left as relative `assets/...`; Swift inlines everything. Reply: { ok: true } */
   | { type: 'copyNote'; id: NoteId; markdown: string; html: string; images: ImageRef[] }
+  /** Copy one rendered image as image data. `folder` guards against copying from a different notes folder. */
+  | { type: 'copyImage'; src: string; folder: string }
   | { type: 'hide' }
   /** An overlay with a text input (⌘P search or ⌘K action menu; one at a time) opened/closed. While open, a native ⌘V
    *  never touches the note: plain text pastes into the overlay's input as usual, our own ⌘⇧C copy arrives as `searchText` (its first readable line), images/files are ignored. */

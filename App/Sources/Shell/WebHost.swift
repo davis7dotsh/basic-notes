@@ -236,6 +236,7 @@ final class WebHost: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDele
         case .togglePin(let id): "togglePin \(id)"
         case .openPin(let i): "openPin \(i)"
         case .copyNote(let id, let md, let html, let images): "copyNote \(id) (md \(md.utf8.count)b, html \(html.utf8.count)b, \(images.count) image ref(s))"
+        case .copyImage: "copyImage"
         case .openURL(let url): "openURL \(url)"
         case .setClipboard(let text, let replaced): "setClipboard (\(text.utf8.count)b\(replaced ? ", replaced" : ""))"
         default: String(describing: msg).components(separatedBy: "(").first ?? "?"

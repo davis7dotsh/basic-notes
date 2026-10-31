@@ -8,6 +8,7 @@ import { absorbListMarker, formatKeymap, wrapOnType } from './commands'
 import { dropImages } from './dnd'
 import { historySlot, redoSelection } from './historyEdit'
 import { images } from './images'
+import { imageContextMenu } from './imageMenu'
 import { highlighting, markdownSupport } from './language'
 import { livePreview } from './livePreview'
 import { passageHighlight } from './searchPassage'
@@ -98,6 +99,7 @@ function extensions(): Extension[] {
     livePreview,
     passageHighlight,
     images,
+    imageContextMenu,
     wrapOnType,
     absorbListMarker,
     dropImages,
